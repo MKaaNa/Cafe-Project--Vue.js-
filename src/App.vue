@@ -1,24 +1,21 @@
 <template>
   <div id="app">
     <div class="auth-container">
-      <img class="logo" alt="Vue logo" src="./assets/image.png">
+      <img class="logo" alt="Vue logo" src="./assets/image.png" />
       <h1>Welcome</h1>
       <p>Please sign up to continue</p>
-      <form class="auth-form">
-        <input type="text" placeholder="Name" class="input-field">
-        <input type="email" placeholder="Email" class="input-field">
-        <input type="password" placeholder="Password" class="input-field">
-        <button class="submit-button">Sign Up</button>
-      </form>
+      <SignUp />
     </div>
   </div>
 </template>
 
 <script>
+import SignUp from './components/SignUp.vue';
+
 export default {
   name: 'App',
   components: {
-
+    SignUp
   }
 }
 </script>
@@ -57,38 +54,5 @@ p {
   font-size: 14px;
   color: #666;
   margin-bottom: 20px;
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-}
-
-.input-field {
-  padding: 10px;
-  margin-bottom: 15px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 14px;
-}
-
-.input-field:focus {
-  border-color: #42b983;
-  outline: none;
-}
-
-.submit-button {
-  padding: 10px;
-  background-color: #42b983;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  font-size: 16px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.submit-button:hover {
-  background-color: #369f6e;
 }
 </style>
