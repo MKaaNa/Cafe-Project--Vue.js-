@@ -12,4 +12,11 @@ module.exports = defineConfig({
       }),
     ],
   },
+  devServer: {
+    host: '0.0.0.0', // Her yerden erişilebilir olsun
+    port: 8080,
+    client: {
+      webSocketURL: 'ws://localhost:8080/ws' // HMR WebSocket bağlantısı burada tanımlanıyor
+    }
+  }
 });

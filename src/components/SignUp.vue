@@ -1,12 +1,20 @@
 <template>
-  <div class="signup-container">
-    <h2>Kayıt Ol</h2>
-    <form @submit.prevent="signUp">
-      <input type="text" placeholder="Adınız" v-model="name" />
-      <input type="email" placeholder="Email" v-model="email" />
-      <input type="password" placeholder="Şifre" v-model="password" />
-      <button type="submit">Sign Up</button>
+  <div class="auth-container">
+    <img class="logo" alt="Vue logo" src="../assets/image.png" />
+    <h1>Welcome</h1>
+    <p>Please sign up to continue</p>
+
+    <form class="auth-form" @submit.prevent="signUp">
+      <input type="text" placeholder="Name" class="input-field" v-model="name" />
+      <input type="email" placeholder="Email" class="input-field" v-model="email" />
+      <input type="password" placeholder="Password" class="input-field" v-model="password" />
+      <button class="submit-button" type="submit">Sign Up</button>
     </form>
+
+    <p class="switch-link">
+      Zaten hesabınız var mı?
+      <a href="#" @click.prevent="goToLogin">Giriş yapın</a>
+    </p>
   </div>
 </template>
 
@@ -14,63 +22,125 @@
 import axios from 'axios';
 
 export default {
-  name: "SignUp",
+  name: 'SignUpPage',
   data() {
     return {
-      name: "",
-      email: "",
-      password: ""
+      name: '',
+      email: '',
+      password: ''
     };
   },
   methods: {
     async signUp() {
-      console.log("Kayıt ol butonuna basıldı.");
-      if (this.name && this.email && this.password) {
+      if (!this.name || !this.email || !this.password) {
+        alert('Lütfen tüm alanları doldurun.');
+        return;
+      }
+
+      if (this.password.length < 6) {
+        alert('Şifreniz en az 6 karakter olmalı.');
+        return;
+      }
+
+      try {
+        const check = await axios.get(
+          `http://localhost:3000/users?email=${this.email}`
+        );
+        if (check.data.length > 0) {
+          alert('Bu email ile zaten kayıt yapılmış.');
+          return;
+        }
+
         const user = {
           name: this.name,
           email: this.email,
-          password: this.password
+          password: this.password,
+          role: 'user'
         };
-        try {
-          await axios.post("http://localhost:3000/users", user);
-          alert("Kayıt başarılı!");
-          this.name = "";
-          this.email = "";
-          this.password = "";
-        } catch (error) {
-          console.error("Kayıt hatası:", error);
-          alert("Kayıt başarısız.");
-        }
-      } else {
-        alert("Lütfen tüm alanları doldurun.");
+
+        await axios.post('http://localhost:3000/users', user);
+        alert('Kayıt başarılı! Giriş yapabilirsiniz.');
+        this.$router.push('/login');
+      } catch (error) {
+        console.error('Kayıt hatası:', error);
+        alert('Kayıt işlemi sırasında hata oluştu.');
       }
+    },
+    goToLogin() {
+      this.$router.push('/login');
     }
   }
 };
 </script>
 
 <style scoped>
-.signup-container {
+.auth-container {
   max-width: 400px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.logo {
+  width: 200px;
+  height: auto;
+  margin-bottom: 20px;
+}
+
+h1 {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+p {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-field {
+  padding: 10px;
+  margin-bottom: 15px;
   border: 1px solid #ccc;
-  border-radius: 8px;
+  border-radius: 5px;
+  font-size: 14px;
 }
 
-input {
-  display: block;
-  width: 100%;
-  margin: 1rem 0;
-  padding: 0.5rem;
+.input-field:focus {
+  border-color: #42b983;
+  outline: none;
 }
 
-button {
-  width: 100%;
-  padding: 0.7rem;
+.submit-button {
+  padding: 10px;
   background-color: #42b983;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.submit-button:hover {
+  background-color: #369f6e;
+}
+
+.switch-link {
+  font-size: 14px;
+  margin-top: 1rem;
+}
+
+.switch-link a {
+  color: #42b983;
+  cursor: pointer;
+  text-decoration: underline;
 }
 </style>
