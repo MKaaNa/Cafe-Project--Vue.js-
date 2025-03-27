@@ -1,226 +1,237 @@
-
 <template>
     <div class="admin-dashboard">
-        <button class="logout-btn" @click="logout">Çıkış Yap</button>
+        <!-- Header -->
+        <header class="dashboard-header">
+            <h1>Admin Paneli</h1>
+            <button class="logout-btn" @click="logout">Çıkış Yap</button>
+        </header>
 
-        <OrderList />
-        <DashboardStatus />
+        <!-- Sekmeler -->
+        <nav class="tabs">
+            <button :class="{ active: activeTab === 'activeOrders' }" @click="activeTab = 'activeOrders'">
+                🟢 Aktif Siparişler
+            </button>
+            <button :class="{ active: activeTab === 'addProduct' }" @click="activeTab = 'addProduct'">
+                ➕ Yeni Ürün Ekle
+            </button>
+            <button :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">
+                📜 Geçmiş Siparişler
+            </button>
+            <button :class="{ active: activeTab === 'staffManagement' }" @click="activeTab = 'staffManagement'">
+                👥 Personel Yönetimi
+            </button>
+        </nav>
 
-
-        <h2>👋 Hoş geldiniz, <span class="highlight">{{ user.name }}</span></h2>
-        <p class="section-title">☕ Menü Yönetimi</p>
-
-        <!-- Ürün Kartları -->
-        <div class="menu-grid">
-            <div class="menu-card" v-for="item in menu" :key="item.id">
-                <img :src="item.image || defaultImage" class="menu-img" />
-                <div>
-                    <h3>{{ item.name }}</h3>
-                    <p>{{ item.price }}₺</p>
+        <!-- İçerik -->
+        <transition name="fade" mode="out-in">
+            <div :key="activeTab" class="tab-content">
+                <div v-if="activeTab === 'activeOrders'">
+                    <div class="header-actions">
+                        <button class="clear-btn" @click="günüBitir">📦 Günü Bitir</button>
+                    </div>
+                    <OrderList :mode="'active'" />
                 </div>
-                <button class="delete-btn" @click="deleteMenuItem(item.id)">Sil</button>
+                <div v-else-if="activeTab === 'addProduct'">
+                    <AddProductForm />
+                </div>
+                <div v-else-if="activeTab === 'history'">
+                    <OrderList :mode="'history'" />
+                </div>
+                <div v-else-if="activeTab === 'staffManagement'">
+                    <StaffManagement />
+                </div>
             </div>
-        </div>
-
-        <!-- Ürün Ekleme Formu -->
-        <div class="add-section">
-            <h3>Yeni Ürün Ekle</h3>
-            <form @submit.prevent="addMenuItem" class="add-form">
-                <input v-model="newItem.name" placeholder="Ürün adı" />
-                <input v-model.number="newItem.price" type="number" placeholder="Fiyat (₺)" />
-                <input v-model="newItem.image" placeholder="Resim URL (opsiyonel)" />
-                <button type="submit" class="add-btn">➕ Ekle</button>
-            </form>
-        </div>
+        </transition>
     </div>
 </template>
 
 <script>
-import axios from 'axios';
 import OrderList from '../components/OrderList.vue';
-import DashboardStatus from '../components/DashboardStatus.vue';
+import AddProductForm from '../components/AddProductForm.vue';
+import StaffManagement from '../components/StaffManagement.vue';
+import axios from 'axios';
 
 export default {
-    name: 'DashboardAdmin',
     components: {
         OrderList,
-        DashboardStatus
+        AddProductForm,
+        StaffManagement
     },
     data() {
         return {
-            user: {},
-            menu: [],
-            newItem: {
-                name: '',
-                price: '',
-                image: ''
-            },
-            defaultImage: 'https://via.placeholder.com/150'
+            activeTab: 'activeOrders'
         };
     },
-    created() {
-        const stored = localStorage.getItem('user');
-        if (stored) {
-            this.user = JSON.parse(stored);
-        }
-
-        this.getMenu();
-    },
     methods: {
-        async getMenu() {
-            try {
-                const res = await axios.get('http://localhost:3000/menu');
-                this.menu = res.data;
-            } catch (err) {
-                console.error('Menü alınamadı:', err);
-            }
-        },
-        async addMenuItem() {
-            if (!this.newItem.name || !this.newItem.price) {
-                alert('Lütfen ürün adı ve fiyat girin.');
-                return;
-            }
-
-            try {
-                await axios.post('http://localhost:3000/menu', this.newItem);
-                this.newItem = { name: '', price: '', image: '' };
-                this.getMenu();
-            } catch (err) {
-                console.error('Ürün eklenemedi:', err);
-            }
-        },
-        async deleteMenuItem(id) {
-            if (!confirm('Bu ürünü silmek istediğinizden emin misiniz?')) return;
-
-            try {
-                await axios.delete(`http://localhost:3000/menu/${id}`);
-                this.getMenu();
-            } catch (err) {
-                console.error('Silme hatası:', err);
-            }
-        },
         logout() {
             localStorage.removeItem('user');
             this.$router.push('/login');
+        },
+        async günüBitir() {
+            const res = await axios.get('http://localhost:3000/orders');
+            const today = new Date().toISOString().split('T')[0]; // Bugün tarihini al
+
+            const todaysOrders = res.data.filter(order => order.timestamp.startsWith(today));
+
+            let totalIncome = 0; // Bugünkü toplam kazanç
+            let staffPerformance = {}; // Garson performansı
+
+            // Her siparişi inceleyelim
+            for (const order of todaysOrders) {
+                totalIncome += order.total; // Toplam kazancı hesapla
+
+                // Garsonun kazancını takip et
+                if (order.createdBy) {
+                    if (!staffPerformance[order.createdBy]) {
+                        staffPerformance[order.createdBy] = { total: 0, orders: 0 };
+                    }
+                    staffPerformance[order.createdBy].total += order.total;
+                    staffPerformance[order.createdBy].orders += 1;
+                }
+
+                // Siparişi "gün sonu" olarak işaretle
+                order.status = 'gün sonu';
+                await axios.put(`http://localhost:3000/orders/${order.id.toString()}`, order);
+            }
+
+            // Staff performans verilerini kaydet
+            for (const [email, performance] of Object.entries(staffPerformance)) {
+                const existingStats = await axios.get(`http://localhost:3000/staffStats?user=${email}&date=${today}`);
+                if (existingStats.data.length > 0) {
+                    const stats = existingStats.data[0];
+                    stats.amount += performance.total;
+                    stats.orders += performance.orders;
+                    await axios.put(`http://localhost:3000/staffStats/${stats.id}`, stats);
+                } else {
+                    await axios.post('http://localhost:3000/staffStats', {
+                        user: email,
+                        amount: performance.total,
+                        orders: performance.orders,
+                        date: today
+                    });
+                }
+            }
+
+            // Günlük kazancı kaydet
+            await axios.post('http://localhost:3000/dailyIncome', {
+                date: today,
+                income: totalIncome
+            });
+
+            alert('Gün başarıyla sonlandırıldı.');
         }
     }
 };
 </script>
 
 <style scoped>
+/* Genel Stil */
 .admin-dashboard {
-    max-width: 1000px;
+    max-width: 1200px;
     margin: 2rem auto;
     padding: 2rem;
-    background: #ffffff;
+    background: #f9f9f9;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    text-align: center;
-    position: relative;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    font-family: 'Inter', sans-serif;
+}
+
+/* Header */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-header h1 {
+    font-size: 28px;
+    color: #2c3e50;
+    font-weight: 600;
 }
 
 .logout-btn {
-    position: absolute;
-    top: 20px;
-    right: 20px;
     background: #e74c3c;
     color: white;
     border: none;
-    padding: 8px 14px;
-    border-radius: 5px;
+    padding: 10px 16px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 13px;
-}
-
-.highlight {
-    color: #42b983;
-    font-weight: bold;
-}
-
-.section-title {
-    font-size: 18px;
-    font-weight: 600;
-    margin: 1rem 0;
-    border-bottom: 2px solid #eee;
-    padding-bottom: 0.5rem;
-}
-
-.menu-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-.menu-card {
-    background: #f7f7f7;
-    padding: 1rem;
-    border-radius: 10px;
-    text-align: left;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.menu-img {
-    width: 100%;
-    height: 120px;
-    object-fit: cover;
-    border-radius: 8px;
-    margin-bottom: 0.5rem;
-}
-
-.menu-card h3 {
-    margin: 0;
-    font-size: 16px;
-    color: #333;
-}
-
-.menu-card p {
     font-size: 14px;
-    color: #666;
-    margin: 0.5rem 0;
+    transition: background 0.3s;
 }
 
-.delete-btn {
-    align-self: flex-end;
-    background: #e74c3c;
-    color: white;
+.logout-btn:hover {
+    background: #c0392b;
+}
+
+/* Sekmeler */
+.tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.tabs button {
+    padding: 10px 18px;
     border: none;
     border-radius: 6px;
-    padding: 6px 12px;
+    background: #ecf0f1;
+    color: #2c3e50;
+    font-weight: 600;
     cursor: pointer;
-    font-size: 13px;
-    margin-top: auto;
+    transition: all 0.3s ease;
 }
 
-.add-section {
-    margin-top: 2rem;
-    text-align: left;
+.tabs button:hover {
+    background: #dcdde1;
 }
 
-.add-form {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.add-form input {
-    flex: 1 1 30%;
-    padding: 8px;
-    font-size: 14px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-}
-
-.add-btn {
+.tabs button.active {
     background: #42b983;
     color: white;
+}
+
+/* İçerik */
+.tab-content {
+    min-height: 400px;
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Header Actions */
+.header-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.clear-btn {
+    background: #f39c12;
+    color: white;
     border: none;
-    padding: 8px 16px;
-    border-radius: 5px;
-    cursor: pointer;
+    padding: 10px 16px;
     font-size: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.clear-btn:hover {
+    background: #e67e22;
+}
+
+/* Animasyon */
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+    transform: translateY(10px);
 }
 </style>

@@ -1,51 +1,87 @@
 <template>
-    <div class="user-dashboard">
+    <div class="garson-dashboard">
         <button class="logout-btn" @click="logout">Çıkış Yap</button>
 
+        <!-- Dinamik Başlık -->
         <h2>👋 Merhaba, <span class="highlight">{{ user.name }}</span></h2>
-        <p class="section-title">📝 Yeni Sipariş Oluştur</p>
+        <p class="section-title">{{ currentTabTitle }}</p>
 
-        <!-- Masa Girişi -->
-        <input v-model="table" placeholder="Masa Numarası" class="table-input" />
+        <!-- Sekme Butonları -->
+        <div class="tabs">
+            <button :class="{ active: currentTab === 'order' }" @click="currentTab = 'order'">
+                Sipariş Ver
+            </button>
+            <button :class="{ active: currentTab === 'active' }" @click="currentTab = 'active'">
+                Aktif Siparişler
+            </button>
+            <button :class="{ active: currentTab === 'history' }" @click="currentTab = 'history'">
+                Geçmiş Siparişler
+            </button>
+        </div>
 
-        <!-- Menü -->
-        <div class="menu-grid">
-            <div class="menu-card" v-for="item in menu" :key="item.id">
-                <img :src="item.image || defaultImage" class="menu-img" />
-                <h3>{{ item.name }}</h3>
-                <p>{{ item.price }}₺</p>
-                <button class="add-btn" @click="addToOrder(item)">Ekle</button>
+        <!-- Sekme İçerikleri -->
+        <div v-if="currentTab === 'order'" class="order-form">
+            <!-- Sipariş Verme Ekranı -->
+            <input v-model="table" placeholder="Masa Numarası" class="table-input" />
+            <div class="menu-grid">
+                <div class="menu-card" v-for="item in menu" :key="item.id">
+                    <img :src="item.image" alt="product image" class="menu-img" />
+                    <h3>{{ item.name }}</h3>
+                    <p>{{ item.price }}₺</p>
+                    <button class="add-btn" @click="addToOrder(item)">Ekle</button>
+                </div>
             </div>
-        </div>
-
-        <!-- Sipariş Özeti -->
-        <div v-if="order.length > 0" class="order-summary">
-            <h3>🧾 Sipariş Özeti</h3>
-            <ul>
-                <li v-for="(item, index) in order" :key="index">
-                    {{ item.name }} - {{ item.price }}₺
-                </li>
-            </ul>
-            <p><strong>Toplam:</strong> {{ totalPrice }}₺</p>
-            <button class="submit-btn" @click="submitOrder">Siparişi Gönder</button>
-        </div>
-
-        <!-- Bugünkü Siparişlerim -->
-        <div v-if="todaysOrders.length > 0" class="active-orders">
-            <h3>📅 Bugünkü Siparişlerim</h3>
-            <div class="order-card" v-for="order in todaysOrders" :key="order.id">
-                <p><strong>Masa:</strong> {{ order.table }}</p>
-                <p><strong>Durum:</strong> {{ order.status }}</p>
+            <div v-if="order.length > 0" class="order-summary">
+                <h3>🧾 Sipariş Özeti</h3>
                 <ul>
-                    <li v-for="(item, index) in order.items" :key="index">
-                        {{ item.name }} - {{ item.price }}₺
+                    <li v-for="(item, index) in order" :key="index">
+                        {{ item.name }} x{{ item.quantity }} - {{ item.price * item.quantity }}₺
+                        <button @click="removeFromOrder(item)">➖</button>
+                        <button @click="addToOrder(item)">➕</button>
                     </li>
                 </ul>
-                <p><strong>Toplam:</strong> {{ order.total }}₺</p>
-                <p class="timestamp">📅 {{ formatDate(order.timestamp) }}</p>
-                <button v-if="order.status === 'hazır'" class="submit-btn" @click="markAsDelivered(order)">
-                    ✅ Teslim Et
-                </button>
+                <p><strong>Toplam:</strong> {{ totalPrice }}₺</p>
+                <button class="submit-btn" @click="submitOrder">Siparişi Gönder</button>
+            </div>
+        </div>
+        <div v-if="currentTab === 'active'" class="order-list">
+            <!-- Aktif Siparişler -->
+            <div class="order-cards">
+                <div v-for="order in activeOrders" :key="order.id" class="order-card">
+                    <h4>Masa {{ order.table }}</h4>
+                    <ul>
+                        <li v-for="(item, index) in order.items" :key="index">
+                            {{ getProductInfo(item).name }} - {{ getProductInfo(item).price }}₺
+                        </li>
+                    </ul>
+                    <p><strong>Toplam:</strong> {{ order.total }}₺</p>
+                    <p v-if="users.length > 0"><strong>Garson:</strong> {{ getGarsonName(order.createdBy) }}</p>
+                    <p class="timestamp">📅 {{ formatDate(order.timestamp) }}</p>
+                    <div class="order-actions">
+                        <button @click="markAsDelivered(order)" v-if="order.status === 'hazır'">
+                            Teslim Et
+                        </button>
+                        <button class="cancel-btn" @click="cancelOrder(order)" v-if="order.status !== 'iptal edildi'">
+                            Siparişi İptal Et
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div v-if="currentTab === 'history'" class="order-list">
+            <!-- Geçmiş Siparişler -->
+            <div class="order-cards">
+                <div v-for="order in historyOrders" :key="order.id" class="order-card">
+                    <h4>Masa {{ order.table }}</h4>
+                    <ul>
+                        <li v-for="(item, index) in order.items" :key="index">
+                            {{ getProductInfo(item).name }} - {{ getProductInfo(item).price }}₺
+                        </li>
+                    </ul>
+                    <p><strong>Toplam:</strong> {{ order.total }}₺</p>
+                    <p v-if="users.length > 0"><strong>Garson:</strong> {{ getGarsonName(order.createdBy) }}</p>
+                    <p class="timestamp">📅 {{ formatDate(order.timestamp) }}</p>
+                </div>
             </div>
         </div>
     </div>
@@ -59,93 +95,135 @@ export default {
     data() {
         return {
             user: {},
+            users: [],
             table: '',
             menu: [],
             order: [],
-            allOrders: [],
-            defaultImage: 'https://via.placeholder.com/150'
+            activeOrders: [],
+            historyOrders: [],
+            currentTab: 'order'  // Varsayılan sekme sipariş verme ekranı olsun
         };
     },
     computed: {
         totalPrice() {
-            return this.order.reduce((sum, item) => sum + item.price, 0);
+            return this.order.reduce((sum, item) => sum + item.price * item.quantity, 0);
         },
-        todaysOrders() {
-            const today = new Date().toISOString().split('T')[0];
-            return this.allOrders.filter(order => {
-                const isToday = order.timestamp?.startsWith(today);
-                const isMine = order.createdBy === this.user.email;
-                return isToday && isMine;
-            });
+        currentTabTitle() {
+            if (this.currentTab === 'order') return '📝 Yeni Sipariş Oluştur';
+            if (this.currentTab === 'active') return '🟢 Aktif Siparişler';
+            if (this.currentTab === 'history') return '📜 Geçmiş Siparişler';
+            return '';
         }
     },
-    created() {
+    async created() {
         const stored = localStorage.getItem('user');
-        if (stored) this.user = JSON.parse(stored);
-        this.fetchMenu();
-        this.fetchOrders();
+        if (stored) {
+            this.user = JSON.parse(stored);
+        }
+        await this.fetchUsers();
+        await this.fetchMenu();
+        await this.fetchOrders();
+        // Sipariş verilerini periyodik olarak yenilemek için:
         setInterval(this.fetchOrders, 5000);
     },
     methods: {
         async fetchMenu() {
-            const res = await axios.get('http://localhost:3000/menu');
-            this.menu = res.data;
+            try {
+                const res = await axios.get('http://localhost:3000/menu');
+                this.menu = res.data;
+            } catch (error) {
+                console.error("Menu verisi alınırken hata oluştu:", error);
+            }
         },
         async fetchOrders() {
-            const res = await axios.get('http://localhost:3000/orders');
-            this.allOrders = res.data;
+            try {
+                const res = await axios.get('http://localhost:3000/orders');
+                this.activeOrders = res.data.filter(order => order.status !== 'teslim edildi' && order.status !== 'iptal edildi');
+                this.historyOrders = res.data.filter(order => order.status === 'teslim edildi');
+            } catch (error) {
+                console.error("Sipariş verisi alınırken hata oluştu:", error);
+            }
+        },
+        async fetchUsers() {
+            try {
+                const res = await axios.get('http://localhost:3000/users');
+                this.users = res.data;
+            } catch (error) {
+                console.error("Kullanıcı verisi alınırken hata oluştu:", error);
+            }
         },
         addToOrder(item) {
-            this.order.push(item);
+            const existingItem = this.order.find(orderItem => orderItem.id === item.id);
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                this.order.push({ ...item, quantity: 1 });
+            }
+        },
+        removeFromOrder(item) {
+            const existingItem = this.order.find(orderItem => orderItem.id === item.id);
+            if (existingItem) {
+                if (existingItem.quantity > 1) {
+                    existingItem.quantity--;
+                } else {
+                    this.order = this.order.filter(orderItem => orderItem.id !== item.id);
+                }
+            }
         },
         async submitOrder() {
             if (!this.table || this.order.length === 0) {
-                alert('Masa ve ürün bilgisi gerekli.');
+                alert('Masa numarası ve ürün seçimi gereklidir.');
                 return;
             }
-
             const newOrder = {
                 table: this.table,
-                items: this.order,
+                items: this.order.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity
+                })),
                 total: this.totalPrice,
                 status: 'onay bekliyor',
                 timestamp: new Date().toISOString(),
                 createdBy: this.user.email
             };
-
-            await axios.post('http://localhost:3000/orders', newOrder);
-            alert('Sipariş gönderildi.');
-            this.order = [];
-            this.fetchOrders();
+            try {
+                await axios.post('http://localhost:3000/orders', newOrder);
+                alert('Sipariş gönderildi.');
+                this.order = [];
+                this.fetchOrders();
+            } catch (error) {
+                console.error("Sipariş gönderilirken hata oluştu:", error);
+            }
         },
         async markAsDelivered(order) {
-            // 1. Siparişin durumunu "teslim edildi" olarak güncelle
             order.status = 'teslim edildi';
-            await axios.put(`http://localhost:3000/orders/${order.id}`, order);
-
-            // 2. Performans verisini güncelle
-            const today = new Date().toISOString().split('T')[0];
-
-            // staffStats içinde aynı kullanıcı ve aynı gün varsa -> toplam üzerine ekle
-            const existingStats = await axios.get(`http://localhost:3000/staffStats?user=${this.user.email}&date=${today}`);
-
-            if (existingStats.data.length > 0) {
-                const stat = existingStats.data[0];
-                const updated = {
-                    ...stat,
-                    amount: stat.amount + order.total
-                };
-                await axios.put(`http://localhost:3000/staffStats/${stat.id}`, updated);
-            } else {
-                await axios.post('http://localhost:3000/staffStats', {
-                    user: this.user.email,
-                    amount: order.total,
-                    date: today
-                });
+            try {
+                await axios.put(`http://localhost:3000/orders/${order.id}`, order);
+                this.fetchOrders();
+            } catch (error) {
+                console.error("Sipariş teslim edilirken hata oluştu:", error);
             }
+        },
+        async cancelOrder(order) {
+            try {
+                // Sipariş durumunu "iptal edildi" olarak güncelle
+                order.status = 'iptal edildi';
+                await axios.put(`http://localhost:3000/orders/${order.id}`, order);
 
-            // 3. Sipariş listesini yenile
-            this.fetchOrders();
+                // Sipariş listesini yeniden yükle
+                this.fetchOrders();
+                alert('Sipariş başarıyla iptal edildi.');
+            } catch (error) {
+                console.error("Sipariş iptal edilirken hata oluştu:", error);
+                alert('Sipariş iptal edilemedi. Lütfen tekrar deneyin.');
+            }
+        },
+        getGarsonName(email) {
+            if (!this.users || this.users.length === 0) return '';
+            const user = this.users.find(u => u.email === email);
+            return user ? user.name : '';
         },
         formatDate(timestamp) {
             return new Date(timestamp).toLocaleString('tr-TR');
@@ -153,13 +231,22 @@ export default {
         logout() {
             localStorage.removeItem('user');
             this.$router.push('/login');
+        },
+        getProductInfo(item) {
+            // Eğer item bir nesne değilse (örneğin sadece id ise), menüden eşleşen ürünü bul
+            if (typeof item === 'string') {
+                const product = this.menu.find(product => product.id === item);
+                return product || { name: 'Bilinmiyor', price: 0 };
+            }
+            // Eğer item zaten bir nesne ise, doğrudan döndür
+            return item;
         }
     }
 };
 </script>
 
 <style scoped>
-.user-dashboard {
+.garson-dashboard {
     max-width: 1000px;
     margin: 2rem auto;
     padding: 2rem;
@@ -231,8 +318,6 @@ export default {
     background: #42b983;
     color: white;
     border: none;
-    padding: 6px 12px;
-    border-radius: 5px;
     cursor: pointer;
     font-size: 14px;
 }
@@ -261,8 +346,34 @@ export default {
     cursor: pointer;
 }
 
-.active-orders {
+.tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.tabs button {
+    padding: 10px;
+    margin: 0 10px;
+    background-color: #42b983;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.tabs .active {
+    background-color: #38a169;
+}
+
+.order-list {
     margin-top: 2rem;
+}
+
+.order-cards {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
 .order-card {
@@ -276,5 +387,21 @@ export default {
     font-size: 12px;
     color: #777;
     margin-top: 0.5rem;
+}
+
+.cancel-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 0.5rem;
+}
+
+.product-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
 }
 </style>
