@@ -43,10 +43,12 @@ export default {
       }
 
       try {
-        const check = await axios.get(
-          `http://localhost:3000/users?email=${this.email}`
-        );
-        if (check.data.length > 0) {
+        // E-posta kontrolü
+        const check = await axios.post('http://localhost:3000/check-email', {
+          email: this.email
+        });
+
+        if (check.data.exists) {
           alert('Bu email ile zaten kayıt yapılmış.');
           return;
         }

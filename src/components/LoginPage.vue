@@ -36,26 +36,36 @@ export default {
             }
 
             try {
-                const response = await axios.get(
-                    `http://localhost:3000/users?email=${this.email}&password=${this.password}`
-                );
+                const response = await axios.post('http://localhost:3000/login', {
+                    email: this.email,
+                    password: this.password
+                });
 
-                if (response.data.length === 0) {
+                const user = response.data;
+
+                if (!user || !user.id) {
                     alert('Email veya şifre hatalı.');
                     return;
                 }
 
-                const user = response.data[0];
                 localStorage.setItem('user', JSON.stringify(user));
 
                 if (user.role === 'admin') {
-                    this.$router.push('/dashboard/admin');
+                    this.$router.push('/dashboard/admin'); // Admin dashboard
+                } else if (user.role === 'user') {
+                    this.$router.push('/dashboard/user'); // User dashboard
                 } else {
-                    this.$router.push('/dashboard/user');
+                    alert('Geçersiz kullanıcı rolü.');
                 }
+
+                console.log('Giriş yapılan kullanıcı:', user);
             } catch (error) {
-                console.error('Giriş hatası:', error);
-                alert('Bir hata oluştu.');
+                if (error.response && error.response.status === 401) {
+                    alert('Email veya şifre hatalı.');
+                } else {
+                    console.error('Giriş hatası:', error);
+                    alert('Bir hata oluştu.');
+                }
             }
         },
         goToRegister() {
