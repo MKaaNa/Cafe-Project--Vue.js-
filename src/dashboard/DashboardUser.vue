@@ -1,27 +1,27 @@
 <template>
     <div class="garson-dashboard">
-        <button class="logout-btn" @click="logout">Çıkış Yap</button>
+        <!-- Header -->
+        <header class="dashboard-header">
+            <h1>👋 Merhaba, <span class="highlight">{{ user.name }}</span></h1>
+            <button class="logout-btn" @click="logout">Çıkış Yap</button>
+        </header>
 
-        <!-- Dinamik Başlık -->
-        <h2>👋 Merhaba, <span class="highlight">{{ user.name }}</span></h2>
-        <p class="section-title">{{ currentTabTitle }}</p>
-
-        <!-- Sekme Butonları -->
-        <div class="tabs">
+        <!-- Sekmeler -->
+        <nav class="tabs">
             <button :class="{ active: currentTab === 'order' }" @click="currentTab = 'order'">
-                Sipariş Ver
+                📝 Sipariş Ver
             </button>
             <button :class="{ active: currentTab === 'active' }" @click="currentTab = 'active'">
-                Aktif Siparişler
+                🟢 Aktif Siparişler
             </button>
             <button :class="{ active: currentTab === 'history' }" @click="currentTab = 'history'">
-                Geçmiş Siparişler
+                📜 Geçmiş Siparişler
             </button>
-        </div>
+        </nav>
 
-        <!-- Sekme İçerikleri -->
+        <!-- İçerik -->
         <div v-if="currentTab === 'order'" class="order-form">
-            <!-- Sipariş Verme Ekranı -->
+            <h2>📝 Yeni Sipariş Oluştur</h2>
             <input v-model="table" placeholder="Masa Numarası" class="table-input" />
             <div class="menu-grid">
                 <div class="menu-card" v-for="item in menu" :key="item.id">
@@ -44,8 +44,9 @@
                 <button class="submit-btn" @click="submitOrder">Siparişi Gönder</button>
             </div>
         </div>
+
         <div v-if="currentTab === 'active'" class="order-list">
-            <!-- Aktif Siparişler -->
+            <h2>🟢 Aktif Siparişler</h2>
             <div class="order-cards">
                 <div v-for="order in activeOrders" :key="order.id" class="order-card">
                     <h4>Masa {{ order.table }}</h4>
@@ -55,7 +56,7 @@
                         </li>
                     </ul>
                     <p><strong>Toplam:</strong> {{ order.total }}₺</p>
-                    <p v-if="users.length > 0"><strong>Garson:</strong> {{ getGarsonName(order.createdBy) }}</p>
+                    <p v-if="users.length > 0"></p>
                     <p class="timestamp">📅 {{ formatDate(order.timestamp) }}</p>
                     <div class="order-actions">
                         <button @click="markAsDelivered(order)" v-if="order.status === 'hazır'">
@@ -68,8 +69,9 @@
                 </div>
             </div>
         </div>
+
         <div v-if="currentTab === 'history'" class="order-list">
-            <!-- Geçmiş Siparişler -->
+            <h2>📜 Geçmiş Siparişler</h2>
             <div class="order-cards">
                 <div v-for="order in historyOrders" :key="order.id" class="order-card">
                     <h4>Masa {{ order.table }}</h4>
@@ -247,48 +249,70 @@ export default {
 
 <style scoped>
 .garson-dashboard {
-    max-width: 1000px;
+    max-width: 1200px;
     margin: 2rem auto;
     padding: 2rem;
-    background: #ffffff;
+    background: #1e1e1e;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    position: relative;
+    color: #ffffff;
+    font-family: 'Inter', sans-serif;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-header h1 {
+    font-size: 24px;
+    color: #42b983;
 }
 
 .logout-btn {
-    position: absolute;
-    top: 20px;
-    right: 20px;
     background: #e74c3c;
     color: white;
     border: none;
-    padding: 8px 14px;
-    border-radius: 5px;
+    padding: 10px 16px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 13px;
-}
-
-.highlight {
-    color: #42b983;
-    font-weight: bold;
-}
-
-.section-title {
-    font-size: 20px;
-    font-weight: 600;
-    margin: 1rem 0;
-    border-bottom: 2px solid #eee;
-    padding-bottom: 0.5rem;
-}
-
-.table-input {
-    width: 200px;
-    padding: 8px;
     font-size: 14px;
-    margin-bottom: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 5px;
+}
+
+.logout-btn:hover {
+    background: #c0392b;
+}
+
+.tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+}
+
+.tabs button {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 6px;
+    background: #2c3e50;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.tabs button:hover {
+    background: #34495e;
+}
+
+.tabs button.active {
+    background: #42b983;
+    color: white;
+}
+
+.order-form,
+.order-list {
+    margin-top: 1.5rem;
 }
 
 .menu-grid {
@@ -299,11 +323,11 @@ export default {
 }
 
 .menu-card {
-    background: #fdfdfd;
+    background: #2c3e50;
     padding: 1rem;
     border-radius: 10px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
     text-align: center;
+    color: white;
 }
 
 .menu-img {
@@ -318,15 +342,21 @@ export default {
     background: #42b983;
     color: white;
     border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
     cursor: pointer;
     font-size: 14px;
 }
 
+.add-btn:hover {
+    background: #369f6e;
+}
+
 .order-summary {
-    background: #f9f9f9;
+    background: #34495e;
     padding: 1rem;
     border-radius: 10px;
-    margin-bottom: 2rem;
+    color: white;
 }
 
 .order-summary ul {
@@ -336,38 +366,17 @@ export default {
 }
 
 .submit-btn {
-    background: #35495e;
+    background: #42b983;
     color: white;
     border: none;
     padding: 10px 16px;
     border-radius: 6px;
     font-size: 14px;
-    margin-top: 0.5rem;
     cursor: pointer;
 }
 
-.tabs {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 1rem;
-}
-
-.tabs button {
-    padding: 10px;
-    margin: 0 10px;
-    background-color: #42b983;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-.tabs .active {
-    background-color: #38a169;
-}
-
-.order-list {
-    margin-top: 2rem;
+.submit-btn:hover {
+    background: #369f6e;
 }
 
 .order-cards {
@@ -377,15 +386,15 @@ export default {
 }
 
 .order-card {
-    background: #f2f2f2;
+    background: #2c3e50;
     padding: 1rem;
-    margin-bottom: 1rem;
     border-radius: 10px;
+    color: white;
 }
 
 .timestamp {
     font-size: 12px;
-    color: #777;
+    color: #bdc3c7;
     margin-top: 0.5rem;
 }
 
@@ -399,9 +408,7 @@ export default {
     margin-top: 0.5rem;
 }
 
-.product-image {
-    width: 80px;
-    height: 80px;
-    object-fit: cover;
+.cancel-btn:hover {
+    background: #c0392b;
 }
 </style>

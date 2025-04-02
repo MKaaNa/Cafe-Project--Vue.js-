@@ -14,6 +14,9 @@
             <button :class="{ active: activeTab === 'addProduct' }" @click="activeTab = 'addProduct'">
                 ➕ Yeni Ürün Ekle
             </button>
+            <button :class="{ active: activeTab === 'productManagement' }" @click="activeTab = 'productManagement'">
+                📋 Ürün Yönetimi
+            </button>
             <button :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">
                 📜 Geçmiş Siparişler
             </button>
@@ -34,6 +37,9 @@
                 <div v-else-if="activeTab === 'addProduct'">
                     <AddProductForm />
                 </div>
+                <div v-else-if="activeTab === 'productManagement'">
+                    <ProductManagement />
+                </div>
                 <div v-else-if="activeTab === 'history'">
                     <OrderList :mode="'history'" />
                 </div>
@@ -48,6 +54,7 @@
 <script>
 import OrderList from '../components/OrderList.vue';
 import AddProductForm from '../components/AddProductForm.vue';
+import ProductManagement from '../components/ProductManagement.vue';
 import StaffManagement from '../components/StaffManagement.vue';
 import axios from 'axios';
 
@@ -55,6 +62,7 @@ export default {
     components: {
         OrderList,
         AddProductForm,
+        ProductManagement,
         StaffManagement
     },
     data() {

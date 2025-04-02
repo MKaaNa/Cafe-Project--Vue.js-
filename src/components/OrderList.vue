@@ -133,6 +133,7 @@ export default {
         async fetchOrders() {
             try {
                 const res = await axios.get('http://localhost:3000/orders');
+                console.log('Siparişler:', res.data); // Siparişleri kontrol edin
                 this.orders = res.data;
             } catch (error) {
                 console.error('Siparişler alınırken hata oluştu:', error);
@@ -155,6 +156,7 @@ export default {
             return new Date(timestamp).toLocaleString('tr-TR');
         },
         async updateStatus(order, newStatus) {
+            console.log('Güncellenen sipariş ID:', order.id); // ID'yi kontrol edin
             order.status = newStatus;
             try {
                 await axios.put(`http://localhost:3000/orders/${order.id}`, order);

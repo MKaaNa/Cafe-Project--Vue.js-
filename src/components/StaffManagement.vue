@@ -86,6 +86,11 @@ export default {
             }
         },
         async removeStaff(id) {
+            if (!id) {
+                console.error('Silinecek personel için geçerli bir ID bulunamadı.');
+                return;
+            }
+
             if (!confirm('Bu personeli silmek istediğinize emin misiniz?')) return;
 
             try {
