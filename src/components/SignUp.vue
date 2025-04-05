@@ -43,16 +43,6 @@ export default {
       }
 
       try {
-        // E-posta kontrolü
-        const check = await axios.post('http://localhost:3000/check-email', {
-          email: this.email
-        });
-
-        if (check.data.exists) {
-          alert('Bu email ile zaten kayıt yapılmış.');
-          return;
-        }
-
         const user = {
           name: this.name,
           email: this.email,

@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const sequelize = require('../models/index');
 const User = require('../models/User');
 const Order = require('../models/Order');
@@ -13,6 +15,33 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' })); // JSON verileri için 10MB sınırı
 app.use(bodyParser.urlencoded({ limit: '10mb', extended: true })); // URL-encoded veriler için 10MB sınırı
 
+const SECRET_KEY = 'your_secret_key'; // Daha güvenli bir ortam değişkeni kullanın
+
+// Middleware: JWT doğrulama
+const authMiddleware = (req, res, next) => {
+    const token = req.headers['authorization'];
+    if (!token) {
+        return res.status(401).json({ message: 'Token eksik. Lütfen giriş yapın.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token.split(' ')[1], SECRET_KEY); // Bearer token doğrulama
+        req.user = decoded;
+        next();
+    } catch (error) {
+        console.error('Token doğrulama hatası:', error.message);
+        return res.status(401).json({ message: 'Geçersiz veya süresi dolmuş token. Lütfen tekrar giriş yapın.' });
+    }
+};
+
+// Middleware: Admin yetkilendirme
+const adminMiddleware = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Bu işlem için yetkiniz yok.' });
+    }
+    next();
+};
+
 // Veritabanını senkronize et
 sequelize.sync({ force: false }) // `force: true` tüm tabloları sıfırlar
     .then(() => console.log('Veritabanı senkronize edildi!'))
@@ -24,28 +53,44 @@ app.get('/users', async (req, res) => {
     res.json(users);
 });
 
+// Kullanıcı giriş
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    console.log('Gelen veriler:', req.body); // Gelen veriyi kontrol edin
-
     try {
-        const user = await User.findOne({ where: { email, password } });
+        const user = await User.findOne({ where: { email } });
 
         if (!user) {
             return res.status(401).json({ message: 'Email veya şifre hatalı.' });
         }
 
-        res.json(user);
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Email veya şifre hatalı.' });
+        }
+
+        // JWT token oluştur
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, SECRET_KEY, { expiresIn: '1h' });
+
+        res.json({ user, token });
     } catch (error) {
         console.error('Giriş sırasında hata oluştu:', error);
         res.status(500).json({ message: 'Bir hata oluştu.' });
     }
 });
 
+// Kullanıcı oluşturma (şifre hash'leme)
 app.post('/users', async (req, res) => {
-    const user = await User.create(req.body);
-    res.json(user);
+    const { name, email, password, role } = req.body;
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await User.create({ name, email, password: hashedPassword, role });
+        res.json(user);
+    } catch (error) {
+        console.error('Kullanıcı oluşturulurken hata oluştu:', error);
+        res.status(500).json({ message: 'Bir hata oluştu.' });
+    }
 });
 
 app.post('/check-email', async (req, res) => {
@@ -65,17 +110,25 @@ app.post('/check-email', async (req, res) => {
     }
 });
 
-app.get('/orders', async (req, res) => {
-    const orders = await Order.findAll();
-    res.json(orders);
+app.get('/orders', authMiddleware, async (req, res) => {
+    try {
+        const orders = await Order.findAll({
+            where: { createdBy: req.user.email } // Sadece giriş yapan kullanıcının siparişlerini getir
+        });
+        res.json(orders);
+    } catch (error) {
+        console.error('Siparişler alınırken hata oluştu:', error);
+        res.status(500).json({ message: 'Bir hata oluştu.' });
+    }
 });
 
-app.post('/orders', async (req, res) => {
+// Sipariş oluşturma (herkes erişebilir)
+app.post('/orders', authMiddleware, async (req, res) => {
     const order = await Order.create(req.body);
     res.json(order);
 });
 
-app.put('/orders/:id', async (req, res) => {
+app.put('/orders/:id', authMiddleware, async (req, res) => {
     try {
         const order = await Order.findByPk(req.params.id);
         if (!order) {
@@ -94,13 +147,14 @@ app.get('/menu', async (req, res) => {
     res.json(menu);
 });
 
-app.post('/menu', async (req, res) => {
+// Menü öğesi ekleme (sadece admin)
+app.post('/menu', authMiddleware, adminMiddleware, async (req, res) => {
     const menuItem = await Menu.create(req.body);
     res.json(menuItem);
 });
 
 // Ürün güncelleme
-app.put('/menu/:id', async (req, res) => {
+app.put('/menu/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const menuItem = await Menu.findByPk(req.params.id);
         if (!menuItem) {
@@ -114,8 +168,8 @@ app.put('/menu/:id', async (req, res) => {
     }
 });
 
-// Ürün silme
-app.delete('/menu/:id', async (req, res) => {
+// Menü öğesi silme (sadece admin)
+app.delete('/menu/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const menuItem = await Menu.findByPk(req.params.id);
         if (!menuItem) {
@@ -129,8 +183,8 @@ app.delete('/menu/:id', async (req, res) => {
     }
 });
 
-// Kullanıcı silme
-app.delete('/users/:id', async (req, res) => {
+// Kullanıcı silme (sadece admin)
+app.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const user = await User.findByPk(req.params.id);
         if (!user) {
