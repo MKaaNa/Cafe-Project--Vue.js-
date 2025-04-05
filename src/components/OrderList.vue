@@ -58,7 +58,9 @@
 </template>
 
 <script>
-import axios from 'axios';
+import { fetchOrders, fetchUsers, updateOrderStatus } from '@/utils/api';
+import { filterOrders, paginateOrders } from '@/utils/orderHelpers';
+import debounce from 'lodash/debounce';
 
 export default {
     name: 'OrderList',
@@ -84,67 +86,40 @@ export default {
     },
     computed: {
         filteredOrders() {
-            let filtered = this.orders;
-
-            if (this.mode === 'active') {
-                // Aktif siparişler: teslim edilmemiş, iptal edilmemiş ve gün sonu olmayan siparişler
-                filtered = filtered.filter(o => !['teslim edildi', 'iptal edildi', 'gün sonu'].includes(o.status));
-            } else if (this.mode === 'history') {
-                // Geçmiş siparişler: teslim edilmiş veya gün sonu olarak işaretlenmiş
-                filtered = filtered.filter(o => o.status === 'teslim edildi' || o.status === 'gün sonu');
-            }
-
-            // Filtreleme (sadece history modda)
-            if (this.mode === 'history') {
-                if (this.filters.date) {
-                    filtered = filtered.filter(o => o.timestamp && o.timestamp.startsWith(this.filters.date));
-                }
-                if (this.filters.user) {
-                    const name = this.filters.user.toLowerCase();
-                    filtered = filtered.filter(o => {
-                        const garson = this.getGarsonName(o.createdBy).toLowerCase();
-                        return garson.includes(name);
-                    });
-                }
-                if (this.filters.minPrice != null) {
-                    filtered = filtered.filter(o => o.total >= this.filters.minPrice);
-                }
-                if (this.filters.maxPrice != null) {
-                    filtered = filtered.filter(o => o.total <= this.filters.maxPrice);
-                }
-            }
-
-            // En yeni sipariş en üstte
-            return filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            return filterOrders(this.orders, this.mode, this.filters, this.getGarsonName);
         },
         paginatedOrders() {
-            const start = (this.currentPage - 1) * this.itemsPerPage;
-            return this.filteredOrders.slice(start, start + this.itemsPerPage);
+            return paginateOrders(this.filteredOrders, this.currentPage, this.itemsPerPage);
         },
         totalPages() {
             return Math.ceil(this.filteredOrders.length / this.itemsPerPage);
         }
     },
     async created() {
-        await this.fetchOrders();
+        const user = JSON.parse(localStorage.getItem('user'));
+        const token = localStorage.getItem('token');
+        if (!user || !token) {
+            alert('Lütfen giriş yapın.');
+            this.$router.push('/login'); // Giriş yapılmamışsa login sayfasına yönlendir
+            return;
+        }
         await this.fetchUsers();
+        this.debouncedFetchOrders();
     },
     methods: {
         async fetchOrders() {
             try {
-                const res = await axios.get('http://localhost:3000/orders');
-                console.log('Siparişler:', res.data); // Siparişleri kontrol edin
-                this.orders = res.data;
+                const allOrders = await fetchOrders();
+                this.orders = allOrders.filter(order => order.createdBy === this.$root.user.email); // Ek kontrol
             } catch (error) {
-                console.error('Siparişler alınırken hata oluştu:', error);
+                alert(error.message);
             }
         },
         async fetchUsers() {
             try {
-                const res = await axios.get('http://localhost:3000/users');
-                this.users = res.data;
+                this.users = await fetchUsers();
             } catch (error) {
-                console.error('Kullanıcı verisi alınırken hata oluştu:', error);
+                alert(error.message);
             }
         },
         getGarsonName(email) {
@@ -156,15 +131,24 @@ export default {
             return new Date(timestamp).toLocaleString('tr-TR');
         },
         async updateStatus(order, newStatus) {
+            const validStatuses = ['onay bekliyor', 'hazır', 'iptal edildi', 'teslim edildi'];
+            if (!validStatuses.includes(newStatus)) {
+                alert('Geçersiz sipariş durumu seçildi.');
+                return;
+            }
+
             console.log('Güncellenen sipariş ID:', order.id); // ID'yi kontrol edin
             order.status = newStatus;
             try {
-                await axios.put(`http://localhost:3000/orders/${order.id}`, order);
-                await this.fetchOrders();
+                await updateOrderStatus(order.id, order);
+                this.debouncedFetchOrders();
             } catch (error) {
-                console.error('Sipariş durumu güncellenirken hata oluştu:', error);
+                alert(error.message);
             }
-        }
+        },
+        debouncedFetchOrders: debounce(async function () {
+            await this.fetchOrders();
+        }, 500) // 500ms gecikme
     },
     watch: {
         filters: {
@@ -246,5 +230,28 @@ export default {
     text-align: center;
     padding: 2rem;
     color: #777;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .filters {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .order-table th,
+    .order-table td {
+        font-size: 12px;
+        padding: 8px;
+    }
+
+    .pagination {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .pagination button {
+        width: 100%;
+    }
 }
 </style>

@@ -41,24 +41,23 @@ export default {
                     password: this.password
                 });
 
-                const user = response.data;
+                const { user, token } = response.data;
 
-                if (!user || !user.id) {
+                if (!user || !token) {
                     alert('Email veya şifre hatalı.');
                     return;
                 }
 
-                localStorage.setItem('user', JSON.stringify(user));
+                localStorage.setItem('user', JSON.stringify(user)); // Kullanıcı bilgilerini kaydet
+                localStorage.setItem('token', token); // Token'ı kaydet
 
                 if (user.role === 'admin') {
-                    this.$router.push('/dashboard/admin'); // Admin dashboard
+                    this.$router.push('/dashboard/admin');
                 } else if (user.role === 'user') {
-                    this.$router.push('/dashboard/user'); // User dashboard
+                    this.$router.push('/dashboard/user');
                 } else {
                     alert('Geçersiz kullanıcı rolü.');
                 }
-
-                console.log('Giriş yapılan kullanıcı:', user);
             } catch (error) {
                 if (error.response && error.response.status === 401) {
                     alert('Email veya şifre hatalı.');

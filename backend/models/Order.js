@@ -3,7 +3,7 @@ const sequelize = require('./index');
 
 const Order = sequelize.define('Order', {
     id: {
-        type: DataTypes.INTEGER, // UUID kullanarak benzersiz bir id oluşturulur
+        type: DataTypes.INTEGER,
         autoIncrement: true,
         primaryKey: true
     },

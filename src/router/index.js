@@ -24,11 +24,10 @@ router.beforeEach((to, from, next) => {
     const protectedRoutes = ['/dashboard/admin', '/dashboard/user'];
 
     if (protectedRoutes.includes(to.path) && !user) {
-        next('/login');
+        next('/login'); // Giriş yapılmamışsa login sayfasına yönlendir
     } else {
-        next();
+        next(); // Giriş yapılmışsa devam et
     }
 });
-
 
 export default router;

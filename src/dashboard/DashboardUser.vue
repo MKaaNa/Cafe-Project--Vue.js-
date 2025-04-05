@@ -54,7 +54,7 @@
                         <li v-for="(item, index) in order.items" :key="index">
                             {{ getProductInfo(item).name }} - {{ getProductInfo(item).price }}₺
                         </li>
-                    </ul>
+                    </ul>Başta
                     <p><strong>Toplam:</strong> {{ order.total }}₺</p>
                     <p v-if="users.length > 0"></p>
                     <p class="timestamp">📅 {{ formatDate(order.timestamp) }}</p>
@@ -119,14 +119,25 @@ export default {
     },
     async created() {
         const stored = localStorage.getItem('user');
-        if (stored) {
-            this.user = JSON.parse(stored);
+        const token = localStorage.getItem('token');
+        if (!stored || !token) {
+            alert('Lütfen giriş yapın.');
+            this.$router.push('/login'); // Giriş yapılmamışsa login sayfasına yönlendir
+            return;
         }
+        this.user = JSON.parse(stored);
         await this.fetchUsers();
         await this.fetchMenu();
-        await this.fetchOrders();
-        // Sipariş verilerini periyodik olarak yenilemek için:
-        setInterval(this.fetchOrders, 5000);
+    },
+    watch: {
+        currentTab: {
+            immediate: true,
+            async handler(newTab) {
+                if (newTab === 'active' || newTab === 'history') {
+                    await this.fetchOrders(); // Sipariş verilerini yalnızca ilgili sekmeye geçildiğinde getir
+                }
+            }
+        }
     },
     methods: {
         async fetchMenu() {
@@ -140,10 +151,15 @@ export default {
         async fetchOrders() {
             try {
                 const res = await axios.get('http://localhost:3000/orders');
-                this.activeOrders = res.data.filter(order => order.status !== 'teslim edildi' && order.status !== 'iptal edildi');
-                this.historyOrders = res.data.filter(order => order.status === 'teslim edildi');
+                const orders = res.data;
+                this.activeOrders = orders.filter(order => order.status !== 'teslim edildi' && order.status !== 'iptal edildi');
+                this.historyOrders = orders.filter(order => order.status === 'teslim edildi');
             } catch (error) {
-                console.error("Sipariş verisi alınırken hata oluştu:", error);
+                console.error('Sipariş verisi alınırken hata oluştu:', error);
+                if (error.response && error.response.status === 401) {
+                    alert('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.');
+                    this.$router.push('/login'); // Login sayfasına yönlendir
+                }
             }
         },
         async fetchUsers() {
