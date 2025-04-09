@@ -2,22 +2,17 @@ import QRCode from 'qrcode';
 
 export async function generateQRCode(data) {
     try {
-        const qrData = JSON.stringify({
-            orderId: data.id,
-            table: data.table,
-            total: data.total,
-            timestamp: new Date().toISOString()
-        });
-        
-        const qrCode = await QRCode.toDataURL(qrData, {
+        const qrCode = await QRCode.toDataURL(JSON.stringify(data), {
             errorCorrectionLevel: 'H',
             margin: 1,
-            width: 200
+            color: {
+                dark: '#000000',
+                light: '#ffffff'
+            }
         });
-        
         return qrCode;
     } catch (error) {
         console.error('QR kod oluşturulurken hata:', error);
-        return null;
+        throw error;
     }
 } 

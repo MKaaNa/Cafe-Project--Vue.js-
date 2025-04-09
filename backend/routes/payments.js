@@ -1,41 +1,37 @@
 const express = require('express');
 const router = express.Router();
-const Payment = require('../models/Payment');
-const Order = require('../models/Order');
+const { Payment, Order } = require('../models');
 const auth = require('../middleware/auth');
 
 // Yeni ödeme oluştur
 router.post('/', auth, async (req, res) => {
     try {
-        const { orderId, amount, method } = req.body;
+        const { orderId, amount, method, givenAmount, change, cardLastFour } = req.body;
 
         // Siparişi kontrol et
         const order = await Order.findByPk(orderId);
         if (!order) {
-            return res.status(404).json({ message: 'Sipariş bulunamadı' });
+            return res.status(404).json({ error: 'Sipariş bulunamadı' });
         }
 
-        // Ödeme tutarını kontrol et
-        if (amount !== order.total) {
-            return res.status(400).json({ message: 'Ödeme tutarı sipariş tutarı ile eşleşmiyor' });
-        }
-
-        // Yeni ödeme oluştur
+        // Ödeme oluştur
         const payment = await Payment.create({
             orderId,
             amount,
             method,
-            status: 'completed',
-            timestamp: new Date()
+            givenAmount,
+            change,
+            cardLastFour,
+            status: 'completed'
         });
 
         // Sipariş durumunu güncelle
-        await order.update({ status: 'paid' });
+        await order.update({ status: 'teslim edildi' });
 
         res.status(201).json(payment);
     } catch (error) {
         console.error('Ödeme oluşturulurken hata:', error);
-        res.status(500).json({ message: 'Sunucu hatası' });
+        res.status(500).json({ error: 'Ödeme işlemi sırasında bir hata oluştu' });
     }
 });
 
@@ -45,14 +41,14 @@ router.get('/', auth, async (req, res) => {
         const payments = await Payment.findAll({
             include: [{
                 model: Order,
-                attributes: ['table', 'items', 'total']
+                attributes: ['table', 'total', 'status']
             }],
             order: [['timestamp', 'DESC']]
         });
         res.json(payments);
     } catch (error) {
-        console.error('Ödeme geçmişi alınırken hata:', error);
-        res.status(500).json({ message: 'Sunucu hatası' });
+        console.error('Ödemeler getirilirken hata:', error);
+        res.status(500).json({ error: 'Ödemeler getirilirken bir hata oluştu' });
     }
 });
 

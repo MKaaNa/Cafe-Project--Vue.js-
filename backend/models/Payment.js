@@ -9,25 +9,29 @@ const Payment = sequelize.define('Payment', {
     },
     orderId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
-        references: {
-            model: 'Orders',
-            key: 'id'
-        }
+        allowNull: false
     },
     amount: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false
     },
     method: {
-        type: DataTypes.ENUM('cash', 'card', 'qr'),
+        type: DataTypes.ENUM('qr', 'cash', 'card'),
         allowNull: false
     },
     status: {
-        type: DataTypes.ENUM('pending', 'completed', 'failed'),
-        defaultValue: 'pending'
+        type: DataTypes.ENUM('completed', 'failed', 'pending'),
+        defaultValue: 'completed'
     },
-    transactionId: {
+    givenAmount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true
+    },
+    change: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true
+    },
+    cardLastFour: {
         type: DataTypes.STRING,
         allowNull: true
     },
