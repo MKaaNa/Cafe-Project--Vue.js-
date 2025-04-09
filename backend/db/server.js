@@ -239,6 +239,25 @@ app.put('/orders/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// Sipariş durumu güncelleme
+app.put('/orders/:id/status', authMiddleware, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        const order = await Order.findByPk(id);
+        if (!order) {
+            return res.status(404).json({ message: 'Sipariş bulunamadı.' });
+        }
+
+        await order.update({ status });
+        res.json(order);
+    } catch (error) {
+        console.error('Sipariş durumu güncellenirken hata:', error);
+        res.status(500).json({ message: 'Bir hata oluştu.' });
+    }
+});
+
 app.get('/menu', async (req, res) => {
     const menu = await Menu.findAll();
     res.json(menu);
