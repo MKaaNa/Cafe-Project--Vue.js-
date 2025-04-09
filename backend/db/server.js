@@ -10,6 +10,10 @@ const Menu = require('../models/Menu');
 const { Sequelize, DataTypes } = require('sequelize');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const PDFDocument = require('pdfkit');
+const { OrderItem, Product } = require('./models');
+const QRCode = require('qrcode');
+const Payment = require('../models/Payment');
 require('dotenv').config();
 
 const app = express();
@@ -429,6 +433,200 @@ app.post('/reset-password', async (req, res) => {
     } catch (error) {
         console.error('Şifre güncelleme hatası:', error);
         res.status(500).json({ message: 'Bir hata oluştu.' });
+    }
+});
+
+// Fatura listesi endpoint'i
+app.get('/api/invoices', authMiddleware, async (req, res) => {
+  try {
+    const invoices = await Order.findAll({
+      where: { status: 'completed' },
+      include: [
+        {
+          model: OrderItem,
+          include: [Product]
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const formattedInvoices = invoices.map(invoice => ({
+      id: invoice.id,
+      createdAt: invoice.createdAt,
+      totalAmount: invoice.totalAmount,
+      items: invoice.OrderItems.map(item => ({
+        name: item.Product.name,
+        quantity: item.quantity,
+        price: item.price
+      }))
+    }));
+
+    res.json(formattedInvoices);
+  } catch (error) {
+    console.error('Fatura listesi alınamadı:', error);
+    res.status(500).json({ error: 'Fatura listesi alınamadı' });
+  }
+});
+
+// QR kod oluşturma endpoint'i
+app.post('/api/qr/generate', authMiddleware, async (req, res) => {
+    try {
+        const { data } = req.body;
+        const qrCode = await QRCode.toDataURL(data);
+        res.json({ data: qrCode });
+    } catch (error) {
+        console.error('QR kod oluşturulurken hata:', error);
+        res.status(500).json({ error: 'QR kod oluşturulurken bir hata oluştu' });
+    }
+});
+
+// Fatura bilgilerini getirme endpoint'i
+app.get('/api/invoices/:id', authMiddleware, async (req, res) => {
+    try {
+        const order = await Order.findByPk(req.params.id, {
+            include: [{
+                model: OrderItem,
+                include: [Product]
+            }]
+        });
+
+        if (!order) {
+            return res.status(404).json({ error: 'Fatura bulunamadı' });
+        }
+
+        const invoice = {
+            id: order.id,
+            table: order.table,
+            items: order.OrderItems.map(item => ({
+                id: item.id,
+                name: item.Product.name,
+                price: item.price,
+                quantity: item.quantity
+            })),
+            totalAmount: order.total,
+            timestamp: order.createdAt
+        };
+
+        res.json(invoice);
+    } catch (error) {
+        console.error('Fatura bilgileri alınırken hata:', error);
+        res.status(500).json({ error: 'Fatura bilgileri alınırken bir hata oluştu' });
+    }
+});
+
+// Fatura indirme endpoint'i
+app.get('/api/invoices/:id/download', authMiddleware, async (req, res) => {
+    try {
+        const order = await Order.findByPk(req.params.id, {
+            include: [{
+                model: OrderItem,
+                include: [Product]
+            }]
+        });
+
+        if (!order) {
+            return res.status(404).json({ error: 'Fatura bulunamadı' });
+        }
+
+        const doc = new PDFDocument();
+        const chunks = [];
+
+        doc.on('data', chunk => chunks.push(chunk));
+        doc.on('end', () => {
+            const result = Buffer.concat(chunks);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=fatura-${order.id}.pdf`);
+            res.send(result);
+        });
+
+        // Fatura başlığı
+        doc.fontSize(20).text('FATURA', { align: 'center' });
+        doc.moveDown();
+
+        // Restoran bilgileri
+        doc.fontSize(12).text('Restoran Adı', { align: 'center' });
+        doc.fontSize(10).text('Adres: Örnek Mahallesi, Örnek Sokak No:1', { align: 'center' });
+        doc.fontSize(10).text('Telefon: (555) 123 45 67', { align: 'center' });
+        doc.moveDown();
+
+        // Fatura detayları
+        doc.fontSize(12).text(`Fatura No: ${order.id}`);
+        doc.text(`Tarih: ${new Date(order.createdAt).toLocaleString('tr-TR')}`);
+        doc.text(`Masa No: ${order.table}`);
+        doc.moveDown();
+
+        // Ürün tablosu
+        const table = {
+            headers: ['Ürün', 'Adet', 'Birim Fiyat', 'Toplam'],
+            rows: order.OrderItems.map(item => [
+                item.Product.name,
+                item.quantity,
+                `${item.price}₺`,
+                `${item.price * item.quantity}₺`
+            ])
+        };
+
+        let y = doc.y;
+        const cellWidth = 130;
+        const cellHeight = 20;
+
+        // Tablo başlıkları
+        table.headers.forEach((header, i) => {
+            doc.rect(50 + i * cellWidth, y, cellWidth, cellHeight).stroke();
+            doc.text(header, 50 + i * cellWidth + 5, y + 5);
+        });
+
+        // Tablo satırları
+        table.rows.forEach((row, rowIndex) => {
+            y += cellHeight;
+            row.forEach((cell, colIndex) => {
+                doc.rect(50 + colIndex * cellWidth, y, cellWidth, cellHeight).stroke();
+                doc.text(cell, 50 + colIndex * cellWidth + 5, y + 5);
+            });
+        });
+
+        // Toplam tutar
+        y += cellHeight;
+        doc.text(`Toplam Tutar: ${order.total}₺`, 50, y + 5);
+
+        // Teşekkür mesajı
+        doc.moveDown();
+        doc.fontSize(10).text('Bizi tercih ettiğiniz için teşekkür ederiz!', { align: 'center' });
+
+        doc.end();
+    } catch (error) {
+        console.error('Fatura indirilirken hata:', error);
+        res.status(500).json({ error: 'Fatura indirilirken bir hata oluştu' });
+    }
+});
+
+// Ödeme oluşturma endpoint'i
+app.post('/payments', authMiddleware, async (req, res) => {
+    try {
+        const { orderId, amount, method, status } = req.body;
+        
+        // Siparişi bul
+        const order = await Order.findByPk(orderId);
+        if (!order) {
+            return res.status(404).json({ error: 'Sipariş bulunamadı' });
+        }
+
+        // Ödeme oluştur
+        const payment = await Payment.create({
+            orderId,
+            amount,
+            method,
+            status,
+            createdBy: req.user.email
+        });
+
+        // Siparişin ödeme durumunu güncelle
+        await order.update({ paymentStatus: status });
+
+        res.status(201).json(payment);
+    } catch (error) {
+        console.error('Ödeme oluşturulurken hata:', error);
+        res.status(500).json({ error: 'Ödeme oluşturulurken bir hata oluştu' });
     }
 });
 

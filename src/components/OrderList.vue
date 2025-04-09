@@ -1,5 +1,9 @@
 <template>
     <div class="order-list">
+        <div class="header">
+            <h2>{{ title }}</h2>
+        </div>
+
         <!-- 🔍 FİLTRELER (Sadece history modunda gösterilir) -->
         <div v-if="mode === 'history'" class="filters">
             <input type="date" v-model="filters.date" />
@@ -83,7 +87,9 @@ export default {
             currentPage: 1,
             itemsPerPage: 10,
             loading: false,
-            error: null
+            error: null,
+            title: 'Sipariş Listesi',
+            isAdmin: false
         };
     },
     computed: {
@@ -107,6 +113,7 @@ export default {
         }
         this.debouncedLoadUsers();
         this.debouncedLoadOrders();
+        this.isAdmin = user.role === 'admin';
     },
     methods: {
         async loadUsers() {
@@ -174,6 +181,13 @@ export default {
     max-width: 100%;
     overflow-x: auto;
     padding-bottom: 1rem;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
 }
 
 .filters {

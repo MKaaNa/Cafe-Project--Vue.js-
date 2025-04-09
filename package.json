@@ -19,6 +19,7 @@
     "sequelize": "^6.37.6",
     "sqlite3": "^5.1.7",
     "vue": "^3.2.13",
+    "vue-qrcode-reader": "^5.7.1",
     "vue-router": "^4.5.0"
   },
   "devDependencies": {

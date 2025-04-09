@@ -65,7 +65,7 @@
                         <li v-for="(item, index) in order.items" :key="index">
                             {{ getProductInfo(item).name }} - {{ getProductInfo(item).price }}₺
                         </li>
-                    </ul>Başta
+                    </ul>
                     <p><strong>Toplam:</strong> {{ order.total }}₺</p>
                     <p v-if="users.length > 0"></p>
                     <p class="timestamp">📅 {{ formatDate(order.timestamp) }}</p>
@@ -108,11 +108,27 @@
                 />
             </div>
         </div>
+
+        <!-- QR Kod Modal -->
+        <div v-if="showQRModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Fatura QR Kodu</h3>
+                    <button @click="showQRModal = false" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="qr-container">
+                        <img :src="qrCode" alt="QR Code" class="qr-code" />
+                        <p>Müşteri bu QR kodu okutarak faturasını görüntüleyebilir</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script>
-import { fetchOrders, fetchUsers, createOrder, updateOrderStatus, fetchMenu } from '@/utils/api';
+import { fetchOrders, fetchUsers, createOrder, updateOrderStatus, fetchMenu, generateQRCode } from '@/utils/api';
 import PaymentScreen from '@/components/PaymentScreen.vue';
 
 export default {
@@ -131,6 +147,8 @@ export default {
             historyOrders: [],
             currentTab: 'order',  // Varsayılan sekme sipariş verme ekranı olsun
             showPaymentScreen: false,
+            showQRModal: false,
+            qrCode: null,
             currentOrder: null
         };
     },
@@ -184,11 +202,12 @@ export default {
                 this.activeOrders = response.data.filter(order => 
                     order.status !== 'teslim edildi' && 
                     order.status !== 'iptal edildi' &&
-                    order.status !== 'gün sonu'
+                    order.status !== 'gün sonu' &&
+                    order.status !== 'ödendi'
                 );
-                // Geçmiş siparişler: teslim edilmiş siparişler
+                // Geçmiş siparişler: teslim edilmiş ve ödenmiş siparişler
                 this.historyOrders = response.data.filter(order => 
-                    order.status === 'teslim edildi' || 
+                    (order.status === 'teslim edildi' && order.paymentStatus === 'completed') || 
                     order.status === 'gün sonu'
                 );
             } catch (error) {
@@ -305,6 +324,20 @@ export default {
             this.showPaymentScreen = false;
             this.fetchOrders();
             alert('Ödeme başarıyla tamamlandı!');
+        },
+        async generateQRCode(order) {
+            try {
+                const qrData = {
+                    invoiceId: order.id,
+                    timestamp: new Date().toISOString()
+                };
+                const response = await generateQRCode(JSON.stringify(qrData));
+                this.qrCode = response.data;
+                this.showQRModal = true;
+            } catch (error) {
+                console.error('QR kod oluşturulurken hata:', error);
+                alert('QR kod oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.');
+            }
         }
     }
 };
@@ -514,12 +547,40 @@ export default {
     transition: all 0.3s ease;
 }
 
+.qr-btn {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.qr-btn:hover {
+    background: #2980b9;
+}
+
+.qr-container {
+    text-align: center;
+    padding: 20px;
+}
+
+.qr-code {
+    max-width: 200px;
+    margin: 0 auto;
+    display: block;
+}
+
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
+    width: 100%;
+    height: 100%;
     background: rgba(0, 0, 0, 0.7);
     display: flex;
     justify-content: center;
@@ -534,5 +595,20 @@ export default {
     max-width: 90%;
     max-height: 90vh;
     overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
 }
 </style>
