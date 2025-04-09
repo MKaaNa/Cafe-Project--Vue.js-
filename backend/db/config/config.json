@@ -1,0 +1,26 @@
+{
+    "development": {
+        "username": "root",
+        "password": null,
+        "database": "resto_db",
+        "host": "127.0.0.1",
+        "dialect": "sqlite",
+        "storage": "./resto.db"
+    },
+    "test": {
+        "username": "root",
+        "password": null,
+        "database": "resto_db_test",
+        "host": "127.0.0.1",
+        "dialect": "sqlite",
+        "storage": "./resto_test.db"
+    },
+    "production": {
+        "username": "root",
+        "password": null,
+        "database": "resto_db_prod",
+        "host": "127.0.0.1",
+        "dialect": "sqlite",
+        "storage": "./resto_prod.db"
+    }
+} 

@@ -1,119 +1,225 @@
 <template>
     <div class="order-form-container">
-        <div class="order-form">
-            <h2>Sipariş Ver</h2>
-            
-            <div class="form-group">
-                <div class="table-number-input-wrapper">
-                    <input 
-                        type="number" 
-                        id="tableNumber" 
-                        v-model="tableNumber" 
-                        class="table-number-input"
-                        placeholder=" " 
-                        min="1"
-                    />
-                    <label for="tableNumber" class="floating-label">Masa Numarası</label>
-                    <span class="table-number-icon">🍽️</span>
-                </div>
-            </div>
-
-            <div class="menu-items">
-                <div v-for="item in menuItems" :key="item.id" class="menu-item" @click="toggleItem(item)">
-                    <div class="item-image" :style="{ backgroundImage: `url(${item.image})` }">
-                        <div class="item-overlay" :class="{ 'selected': isSelected(item) }">
-                            <span class="check-icon" v-if="isSelected(item)">✓</span>
-                        </div>
-                    </div>
-                    <div class="item-details">
-                        <h3>{{ item.name }}</h3>
-                        <p class="item-description">{{ item.description }}</p>
-                        <div class="item-footer">
-                            <span class="item-price">{{ item.price }}₺</span>
-                            <span class="item-quantity" v-if="isSelected(item)">
-                                {{ getItemQuantity(item) }} adet
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="order-summary" v-if="selectedItems.length > 0">
-                <h3>Sipariş Özeti</h3>
-                <div class="selected-items">
-                    <div v-for="item in selectedItems" :key="item.id" class="selected-item">
-                        <span class="item-name">{{ item.name }}</span>
-                        <div class="quantity-controls">
-                            <button @click.stop="decreaseQuantity(item)" class="quantity-btn">-</button>
-                            <span class="quantity">{{ item.quantity }}</span>
-                            <button @click.stop="increaseQuantity(item)" class="quantity-btn">+</button>
-                        </div>
-                        <span class="item-total">{{ (item.price * item.quantity).toFixed(2) }}₺</span>
-                    </div>
-                </div>
-                <div class="total-amount">
-                    Toplam: {{ calculateTotal().toFixed(2) }}₺
-                </div>
-            </div>
-
-            <button 
-                class="submit-button" 
-                @click="submitOrder" 
-                :disabled="!canSubmit"
-                :class="{ 'disabled': !canSubmit }"
-            >
-                Siparişi Tamamla
-            </button>
+      <div class="order-form">
+        <h2>Sipariş Ver</h2>
+  
+        <!-- Masa Numarası -->
+        <div class="form-group">
+          <div class="table-number-input-wrapper">
+            <input
+              type="number"
+              id="tableNumber"
+              v-model="tableNumber"
+              class="table-number-input"
+              placeholder=" "
+              min="1"
+            />
+            <label for="tableNumber" class="floating-label">Masa Numarası</label>
+            <span class="table-number-icon">🍽️</span>
+          </div>
         </div>
+  
+        <!-- Menüden Ürün Seçimi -->
+        <div class="menu-items">
+          <div
+            v-for="item in menuItems"
+            :key="item.id"
+            class="menu-item"
+            @click="toggleItem(item)"
+          >
+            <div class="item-image" :style="{ backgroundImage: `url(${item.image})` }">
+              <div class="item-overlay" :class="{ selected: isSelected(item) }">
+                <span class="check-icon" v-if="isSelected(item)">✓</span>
+              </div>
+            </div>
+            <div class="item-details">
+              <h3>{{ item.name }}</h3>
+              <p class="item-description">{{ item.description }}</p>
+              <div class="item-footer">
+                <span class="item-price">{{ item.price }}₺</span>
+                <span class="item-quantity" v-if="isSelected(item)">
+                  {{ getItemQuantity(item) }} adet
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <!-- Sipariş Özeti -->
+        <div class="order-summary" v-if="selectedItems.length > 0">
+          <h3>Sipariş Özeti</h3>
+          <div class="selected-items">
+            <div v-for="item in selectedItems" :key="item.id" class="selected-item">
+              <span class="item-name">{{ item.name }}</span>
+              <div class="quantity-controls">
+                <button @click.stop="decreaseQuantity(item)" class="quantity-btn">-</button>
+                <span class="quantity">{{ item.quantity }}</span>
+                <button @click.stop="increaseQuantity(item)" class="quantity-btn">+</button>
+              </div>
+              <span class="item-total">{{ (item.price * item.quantity).toFixed(2) }}₺</span>
+            </div>
+          </div>
+          <div class="total-amount">
+            Toplam: {{ calculateTotal().toFixed(2) }}₺
+          </div>
+        </div>
+  
+        <!-- Kart Bilgileri -->
+        <div class="card-form" v-if="selectedItems.length > 0">
+          <h3>Kart Bilgileri</h3>
+          <input v-model="card.name" type="text" placeholder="Kart Sahibi Adı Soyadı" />
+          <input v-model="card.number" type="text" placeholder="Kart Numarası" />
+          <div class="card-row">
+            <input v-model="card.expiry" type="text" placeholder="Son Kullanma (MM/YY)" />
+            <input v-model="card.cvv" type="text" placeholder="CVV" />
+          </div>
+        </div>
+  
+        <!-- Siparişi Tamamla -->
+        <button
+          class="submit-button"
+          @click="submitOrder"
+          :disabled="!canSubmit"
+          :class="{ disabled: !canSubmit }"
+        >
+          Siparişi Tamamla
+        </button>
+      </div>
     </div>
-</template>
-
-<script>
-</script>
-
-<style scoped>
-.order-form-container {
+  </template>
+  
+  <script setup>
+  import { ref, reactive, computed } from 'vue'
+  
+  const tableNumber = ref('')
+  const menuItems = reactive([
+    {
+      id: 1,
+      name: 'Çay',
+      description: 'Demleme Rize çayı',
+      price: 7.5,
+      image: 'https://via.placeholder.com/300x200?text=Çay'
+    },
+    {
+      id: 2,
+      name: 'Kahve',
+      description: 'Türk kahvesi',
+      price: 12,
+      image: 'https://via.placeholder.com/300x200?text=Kahve'
+    },
+    {
+      id: 3,
+      name: 'Tost',
+      description: 'Kaşarlı Tost',
+      price: 25,
+      image: 'https://via.placeholder.com/300x200?text=Tost'
+    }
+  ])
+  const selectedItems = reactive([])
+  
+  const card = reactive({
+    name: '',
+    number: '',
+    expiry: '',
+    cvv: ''
+  })
+  
+  const isSelected = (item) => selectedItems.find((i) => i.id === item.id)
+  
+  const getItemQuantity = (item) => {
+    const found = selectedItems.find((i) => i.id === item.id)
+    return found ? found.quantity : 0
+  }
+  
+  const toggleItem = (item) => {
+    const existing = selectedItems.find((i) => i.id === item.id)
+    if (existing) {
+      existing.quantity++
+    } else {
+      selectedItems.push({ ...item, quantity: 1 })
+    }
+  }
+  
+  const increaseQuantity = (item) => {
+    item.quantity++
+  }
+  
+  const decreaseQuantity = (item) => {
+    item.quantity--
+    if (item.quantity <= 0) {
+      const index = selectedItems.findIndex((i) => i.id === item.id)
+      selectedItems.splice(index, 1)
+    }
+  }
+  
+  const calculateTotal = () => {
+    return selectedItems.reduce((acc, item) => acc + item.price * item.quantity, 0)
+  }
+  
+  const canSubmit = computed(() =>
+    tableNumber.value &&
+    selectedItems.length > 0 &&
+    card.name &&
+    card.number &&
+    card.expiry &&
+    card.cvv
+  )
+  
+  const submitOrder = () => {
+    if (canSubmit.value) {
+      alert(`Masa ${tableNumber.value} için sipariş alındı. Ödeme tamamlandı! 🎉`)
+      tableNumber.value = ''
+      selectedItems.splice(0)
+      card.name = ''
+      card.number = ''
+      card.expiry = ''
+      card.cvv = ''
+    }
+  }
+  </script>
+  
+  <style scoped>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+  
+  .order-form-container {
+    background: #f5f7fa;
     padding: 2rem;
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-.order-form {
+    min-height: 100vh;
+    font-family: 'Poppins', sans-serif;
+  }
+  
+  .order-form {
+    max-width: 900px;
+    margin: auto;
     background: white;
-    border-radius: 15px;
+    border-radius: 20px;
     padding: 2rem;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-}
-
-h2 {
+  }
+  
+  h2 {
+    text-align: center;
     color: #2c3e50;
     margin-bottom: 2rem;
-    text-align: center;
-    font-size: 2rem;
-}
-
-.form-group {
-    margin-bottom: 2rem;
-}
-
-.table-number-input-wrapper {
+  }
+  
+  .table-number-input-wrapper {
     position: relative;
     display: flex;
     align-items: center;
-    background: #f9f9f9;
+    background: #f0f0f0;
     border: 2px solid #ddd;
     border-radius: 8px;
     padding: 0.75rem 1rem;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.table-number-input-wrapper:focus-within {
+  }
+  
+  .table-number-input-wrapper:focus-within {
     border-color: #42b983;
     box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.2);
-}
-
-.table-number-input {
+  }
+  
+  .table-number-input {
     flex: 1;
     border: none;
     background: transparent;
@@ -121,13 +227,9 @@ h2 {
     color: #333;
     outline: none;
     z-index: 1;
-}
-
-.table-number-input::placeholder {
-    color: transparent;
-}
-
-.floating-label {
+  }
+  
+  .floating-label {
     position: absolute;
     left: 1rem;
     top: 50%;
@@ -136,214 +238,169 @@ h2 {
     font-size: 1rem;
     pointer-events: none;
     transition: 0.2s ease all;
-}
-
-.table-number-input:focus + .floating-label,
-.table-number-input:not(:placeholder-shown) + .floating-label {
+  }
+  
+  .table-number-input:focus + .floating-label,
+  .table-number-input:not(:placeholder-shown) + .floating-label {
     top: 0.3rem;
     font-size: 0.75rem;
     color: #42b983;
-}
-
-.table-number-icon {
+  }
+  
+  .table-number-icon {
     margin-left: 0.5rem;
     font-size: 1.5rem;
     color: #42b983;
-}
-
-.table-number-input-wrapper:hover {
-    border-color: #42b983;
-    box-shadow: 0 4px 8px rgba(66, 185, 131, 0.1);
-}
-
-.menu-items {
+  }
+  
+  .menu-items {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.menu-item {
+    margin: 2rem 0;
+  }
+  
+  .menu-item {
     background: white;
-    border-radius: 12px;
+    border-radius: 15px;
     overflow: hidden;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-    transition: all 0.3s ease;
     cursor: pointer;
-}
-
-.menu-item:hover {
+    transition: transform 0.3s ease;
+  }
+  
+  .menu-item:hover {
     transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-}
-
-.item-image {
-    height: 200px;
+  }
+  
+  .item-image {
+    height: 180px;
     background-size: cover;
     background-position: center;
     position: relative;
-}
-
-.item-overlay {
+  }
+  
+  .item-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: rgba(66, 185, 131, 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
     opacity: 0;
     transition: opacity 0.3s ease;
-}
-
-.item-overlay.selected {
+  }
+  
+  .item-overlay.selected {
     opacity: 1;
-}
-
-.check-icon {
+  }
+  
+  .check-icon {
     color: white;
     font-size: 2rem;
     font-weight: bold;
-}
-
-.item-details {
+  }
+  
+  .item-details {
     padding: 1rem;
-}
-
-.item-details h3 {
-    margin: 0 0 0.5rem 0;
-    color: #2c3e50;
-}
-
-.item-description {
-    color: #666;
-    font-size: 0.9rem;
-    margin-bottom: 1rem;
-}
-
-.item-footer {
+  }
+  
+  .item-footer {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-}
-
-.item-price {
-    font-weight: bold;
+    margin-top: 1rem;
+  }
+  
+  .item-price {
     color: #42b983;
-}
-
-.item-quantity {
+    font-weight: bold;
+  }
+  
+  .item-quantity {
     background: #42b983;
     color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    padding: 0.2rem 0.6rem;
+    border-radius: 8px;
     font-size: 0.9rem;
-}
-
-.order-summary {
-    background: #f8f9fa;
+  }
+  
+  .order-summary {
+    margin-top: 2rem;
+    background: #f9f9f9;
     border-radius: 12px;
     padding: 1.5rem;
-    margin-bottom: 2rem;
-}
-
-.order-summary h3 {
-    margin-top: 0;
-    color: #2c3e50;
-}
-
-.selected-items {
-    margin: 1rem 0;
-}
-
-.selected-item {
+  }
+  
+  .selected-item {
     display: flex;
     justify-content: space-between;
-    align-items: center;
     padding: 0.5rem 0;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.selected-item:last-child {
-    border-bottom: none;
-}
-
-.quantity-controls {
+    border-bottom: 1px solid #ddd;
+    align-items: center;
+  }
+  
+  .quantity-controls {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-}
-
-.quantity-btn {
+  }
+  
+  .quantity-btn {
     background: #42b983;
     color: white;
     border: none;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     cursor: pointer;
-    transition: background 0.3s ease;
-}
-
-.quantity-btn:hover {
-    background: #3aa876;
-}
-
-.quantity {
-    min-width: 24px;
-    text-align: center;
-}
-
-.total-amount {
+  }
+  
+  .total-amount {
     text-align: right;
-    font-weight: bold;
-    font-size: 1.2rem;
-    color: #2c3e50;
     margin-top: 1rem;
-}
-
-.submit-button {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #2c3e50;
+  }
+  
+  .card-form {
+    margin-top: 2rem;
+  }
+  
+  .card-form input {
+    padding: 0.75rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 10px;
     width: 100%;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+  }
+  
+  .card-row {
+    display: flex;
+    gap: 1rem;
+  }
+  
+  .submit-button {
+    width: 100%;
+    margin-top: 1rem;
     padding: 1rem;
     background: #42b983;
     color: white;
-    border: none;
-    border-radius: 8px;
     font-size: 1.1rem;
-    font-weight: 500;
+    border: none;
+    border-radius: 12px;
     cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.submit-button:hover:not(.disabled) {
-    background: #3aa876;
+    transition: background 0.3s ease, transform 0.2s;
+  }
+  
+  .submit-button:hover:not(.disabled) {
+    background: #36986d;
     transform: translateY(-2px);
-}
-
-.submit-button.disabled {
+  }
+  
+  .submit-button.disabled {
     background: #ccc;
     cursor: not-allowed;
-}
-
-/* Animations */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.menu-item {
-    animation: fadeIn 0.5s ease forwards;
-}
-
-.menu-item:nth-child(1) { animation-delay: 0.1s; }
-.menu-item:nth-child(2) { animation-delay: 0.2s; }
-.menu-item:nth-child(3) { animation-delay: 0.3s; }
-.menu-item:nth-child(4) { animation-delay: 0.4s; }
-.menu-item:nth-child(5) { animation-delay: 0.5s; }
-.menu-item:nth-child(6) { animation-delay: 0.6s; }
-</style>
+  }
+  </style>

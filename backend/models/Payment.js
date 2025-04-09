@@ -16,29 +16,20 @@ const Payment = sequelize.define('Payment', {
         allowNull: false
     },
     method: {
-        type: DataTypes.ENUM('qr', 'cash', 'card'),
+        type: DataTypes.STRING,
         allowNull: false
     },
     status: {
-        type: DataTypes.ENUM('completed', 'failed', 'pending'),
-        defaultValue: 'completed'
-    },
-    givenAmount: {
-        type: DataTypes.DECIMAL(10, 2),
-        allowNull: true
-    },
-    change: {
-        type: DataTypes.DECIMAL(10, 2),
-        allowNull: true
-    },
-    cardLastFour: {
         type: DataTypes.STRING,
-        allowNull: true
+        allowNull: false,
+        defaultValue: 'pending'
     },
-    timestamp: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW
+    createdBy: {
+        type: DataTypes.STRING,
+        allowNull: false
     }
+}, {
+    timestamps: true
 });
 
 module.exports = Payment; 

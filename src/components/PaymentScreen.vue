@@ -1,116 +1,98 @@
 <template>
     <div class="payment-screen">
         <h2>Ödeme Ekranı</h2>
-        <div class="order-summary">
-            <h3>Sipariş Özeti</h3>
-            <p>Masa: {{ order.table }}</p>
+        <div class="order-details">
+            <h3>Masa {{ order.table }}</h3>
             <ul>
                 <li v-for="(item, index) in order.items" :key="index">
-                    {{ getProductInfo(item).name }} x{{ item.quantity }} - {{ item.price * item.quantity }}₺
+                    {{ item.name }} x{{ item.quantity }} - {{ item.price * item.quantity }}₺
                 </li>
             </ul>
             <p class="total">Toplam: {{ order.total }}₺</p>
         </div>
 
-        <div class="payment-methods">
-            <h3>Ödeme Yöntemi Seçin</h3>
-            <div class="payment-options">
-                <button 
-                    class="payment-btn" 
-                    :class="{ active: selectedMethod === 'qr' }"
-                    @click="selectPaymentMethod('qr')"
-                >
-                    <i class="fas fa-qrcode"></i> QR Kod ile Öde
-                </button>
-                <button 
-                    class="payment-btn" 
-                    :class="{ active: selectedMethod === 'cash' }"
-                    @click="selectPaymentMethod('cash')"
-                >
-                    <i class="fas fa-money-bill-wave"></i> Nakit Öde
-                </button>
-                <button 
-                    class="payment-btn" 
-                    :class="{ active: selectedMethod === 'card' }"
-                    @click="selectPaymentMethod('card')"
-                >
-                    <i class="fas fa-credit-card"></i> Kart ile Öde
-                </button>
-            </div>
-
-            <!-- QR Kod Görüntüleme -->
-            <div v-if="selectedMethod === 'qr' && qrCode" class="qr-container">
-                <img :src="qrCode" alt="QR Code" class="qr-code" />
-                <p>QR kodu okutarak ödeme yapabilirsiniz</p>
-            </div>
-
-            <!-- Nakit Ödeme -->
-            <div v-if="selectedMethod === 'cash'" class="cash-payment">
-                <div class="input-group">
-                    <label>Verilen Tutar:</label>
-                    <input 
-                        type="number" 
-                        v-model="givenAmount" 
-                        placeholder="Verilen tutarı girin"
-                        min="0"
-                        step="0.01"
-                    />
+        <div v-if="!showQRCode" class="payment-form">
+            <h3>Kart Bilgileri</h3>
+            <div class="card-preview">
+                <div class="card-front">
+                    <div class="card-logo">VISA</div>
+                    <div class="card-number">{{ cardNumber || '•••• •••• •••• ••••' }}</div>
+                    <div class="card-details">
+                        <div class="card-holder">
+                            <span>Kart Sahibi</span>
+                            <div>AD SOYAD</div>
+                        </div>
+                        <div class="card-expiry">
+                            <span>Son Kullanma</span>
+                            <div>{{ expiryDate || 'MM/YY' }}</div>
+                        </div>
+                    </div>
                 </div>
-                <p v-if="givenAmount > 0" class="change">
-                    Para Üstü: {{ (givenAmount - order.total).toFixed(2) }}₺
-                </p>
+                <div class="card-back">
+                    <div class="card-strip"></div>
+                    <div class="card-cvv">
+                        <span>CVV</span>
+                        <div>{{ cvv || '•••' }}</div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Kart Ödeme -->
-            <div v-if="selectedMethod === 'card'" class="card-payment">
-                <div class="input-group">
-                    <label>Kart Numarası:</label>
+            <div class="form-group">
+                <label>Kart Numarası</label>
+                <input 
+                    type="text" 
+                    v-model="cardNumber" 
+                    placeholder="1234 5678 9012 3456"
+                    maxlength="19"
+                    @input="formatCardNumber"
+                    class="card-input"
+                />
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Son Kullanma Tarihi</label>
                     <input 
                         type="text" 
-                        v-model="cardNumber" 
-                        placeholder="1234 5678 9012 3456"
-                        maxlength="19"
+                        v-model="expiryDate" 
+                        placeholder="MM/YY"
+                        maxlength="5"
+                        @input="formatExpiryDate"
+                        class="card-input"
                     />
                 </div>
-                <div class="card-details">
-                    <div class="input-group">
-                        <label>Son Kullanma:</label>
-                        <input 
-                            type="text" 
-                            v-model="expiryDate" 
-                            placeholder="MM/YY"
-                            maxlength="5"
-                        />
-                    </div>
-                    <div class="input-group">
-                        <label>CVV:</label>
-                        <input 
-                            type="text" 
-                            v-model="cvv" 
-                            placeholder="123"
-                            maxlength="3"
-                        />
-                    </div>
+                <div class="form-group">
+                    <label>CVV</label>
+                    <input 
+                        type="password" 
+                        v-model="cvv" 
+                        placeholder="123"
+                        maxlength="3"
+                        class="card-input"
+                    />
                 </div>
             </div>
+            <button class="pay-btn" @click="processPayment" :disabled="isProcessing">
+                {{ isProcessing ? 'İşleniyor...' : 'Öde' }}
+            </button>
         </div>
 
-        <div class="payment-actions">
-            <button class="cancel-btn" @click="$emit('cancel')">İptal</button>
-            <button 
-                class="complete-btn" 
-                @click="completePayment"
-                :disabled="!canCompletePayment"
-            >
-                Ödemeyi Tamamla
-            </button>
+        <div v-if="showQRCode" class="qr-container">
+            <h3>Fatura QR Kodu</h3>
+            <div class="qr-code">
+                <canvas ref="qrCanvas"></canvas>
+            </div>
+            <p>Müşteri bu QR kodu okutarak faturasını görüntüleyebilir</p>
+            <div class="action-buttons">
+                <button class="complete-btn" @click="completeOrder">Siparişi Tamamla</button>
+                <button class="close-btn" @click="closePayment">Kapat</button>
+            </div>
         </div>
     </div>
 </template>
 
 <script>
-import { generateQRCode } from '@/utils/qrGenerator';
-import { createPayment } from '@/utils/api';
+import QRCode from 'qrcode';
+import { updateOrderStatus } from '@/utils/api';
 
 export default {
     name: 'PaymentScreen',
@@ -122,86 +104,93 @@ export default {
     },
     data() {
         return {
-            selectedMethod: null,
-            qrCode: null,
-            givenAmount: 0,
             cardNumber: '',
             expiryDate: '',
             cvv: '',
-            menu: []
+            showQRCode: false,
+            isProcessing: false
         };
     },
-    computed: {
-        canCompletePayment() {
-            if (this.selectedMethod === 'cash') {
-                return this.givenAmount >= this.order.total;
-            } else if (this.selectedMethod === 'card') {
-                return this.cardNumber.length === 19 && 
-                       this.expiryDate.length === 5 && 
-                       this.cvv.length === 3;
-            }
-            return this.selectedMethod === 'qr';
-        }
-    },
     methods: {
-        async selectPaymentMethod(method) {
-            this.selectedMethod = method;
-            if (method === 'qr') {
-                // QR kod için ödeme bilgilerini oluştur
-                const paymentData = {
-                    orderId: this.order.id,
-                    amount: this.order.total,
-                    timestamp: new Date().toISOString()
-                };
-                this.qrCode = await generateQRCode(JSON.stringify(paymentData));
-            }
+        formatCardNumber() {
+            this.cardNumber = this.cardNumber.replace(/\s/g, '').replace(/(\d{4})/g, '$1 ').trim();
         },
-        async completePayment() {
-            try {
-                const paymentData = {
-                    orderId: this.order.id,
-                    amount: this.order.total,
-                    method: this.selectedMethod,
-                    status: 'completed',
-                    timestamp: new Date().toISOString()
-                };
-
-                if (this.selectedMethod === 'cash') {
-                    paymentData.givenAmount = this.givenAmount;
-                    paymentData.change = this.givenAmount - this.order.total;
-                } else if (this.selectedMethod === 'card') {
-                    paymentData.cardLastFour = this.cardNumber.slice(-4);
-                }
-
-                await createPayment(paymentData);
-                this.$emit('payment-completed');
-            } catch (error) {
-                console.error('Ödeme tamamlanırken hata:', error);
-                alert('Ödeme işlemi sırasında bir hata oluştu. Lütfen tekrar deneyin.');
-            }
-        },
-        getProductInfo(item) {
-            if (typeof item === 'string') {
-                const product = this.menu.find(product => product.id === item);
-                return product || { name: 'Bilinmiyor', price: 0 };
-            }
-            return item;
-        }
-    },
-    watch: {
-        cardNumber(newVal) {
-            // Kart numarasını formatla: 1234 5678 9012 3456
-            this.cardNumber = newVal.replace(/\s/g, '').replace(/(\d{4})/g, '$1 ').trim();
-        },
-        expiryDate(newVal) {
-            // Son kullanma tarihini formatla: MM/YY
-            this.expiryDate = newVal.replace(/\D/g, '')
+        formatExpiryDate() {
+            this.expiryDate = this.expiryDate.replace(/\D/g, '')
                 .replace(/^(\d{2})/, '$1/')
                 .substr(0, 5);
         },
-        cvv(newVal) {
-            // CVV'yi sadece rakam olacak şekilde sınırla
-            this.cvv = newVal.replace(/\D/g, '').substr(0, 3);
+        async processPayment() {
+            if (!this.cardNumber || !this.expiryDate || !this.cvv) {
+                alert('Lütfen tüm alanları doldurun');
+                return;
+            }
+
+            if (this.cardNumber.replace(/\s/g, '').length !== 16) {
+                alert('Geçerli bir kart numarası girin');
+                return;
+            }
+
+            if (this.expiryDate.length !== 5) {
+                alert('Geçerli bir son kullanma tarihi girin');
+                return;
+            }
+
+            if (this.cvv.length !== 3) {
+                alert('Geçerli bir CVV girin');
+                return;
+            }
+
+            this.isProcessing = true;
+
+            try {
+                // Ödeme işlemi simülasyonu
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                // QR kodu oluştur
+                const qrData = {
+                    type: 'invoice',
+                    orderId: this.order.id,
+                    table: this.order.table,
+                    total: this.order.total,
+                    timestamp: new Date().toISOString(),
+                    items: this.order.items.map(item => ({
+                        name: item.name,
+                        quantity: item.quantity,
+                        price: item.price
+                    }))
+                };
+
+                await QRCode.toCanvas(this.$refs.qrCanvas, JSON.stringify(qrData), {
+                    width: 200,
+                    margin: 2,
+                    color: {
+                        dark: '#42b983',
+                        light: '#1e1e1e'
+                    }
+                });
+
+                this.showQRCode = true;
+                this.$emit('payment-completed');
+            } catch (error) {
+                console.error('QR kod oluşturulurken hata:', error);
+                alert('QR kod oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.');
+            } finally {
+                this.isProcessing = false;
+            }
+        },
+        async completeOrder() {
+            try {
+                await updateOrderStatus(this.order.id, 'ödendi');
+                this.$emit('order-completed');
+                this.closePayment();
+            } catch (error) {
+                console.error('Sipariş tamamlanırken hata:', error);
+                alert('Sipariş tamamlanırken bir hata oluştu. Lütfen tekrar deneyin.');
+            }
+        },
+        closePayment() {
+            this.$emit('close');
         }
     }
 };
@@ -209,135 +198,256 @@ export default {
 
 <style scoped>
 .payment-screen {
-    background: #1e1e1e;
+    background: #f5f5f5;
     padding: 2rem;
     border-radius: 12px;
-    color: white;
+    color: #333;
     max-width: 600px;
     margin: 0 auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    font-family: 'Roboto', sans-serif; /* Modern font */
 }
 
-.order-summary {
-    background: #2c3e50;
+.order-details {
+    margin-bottom: 2rem;
     padding: 1rem;
+    background: #ffffff;
     border-radius: 8px;
-    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.order-summary ul {
+.order-details ul {
     list-style: none;
-    padding-left: 0;
-    margin: 0.5rem 0;
+    padding: 0;
+    margin: 1rem 0;
 }
 
 .total {
+    font-size: 1.4rem;
     font-weight: bold;
-    font-size: 1.2rem;
-    margin-top: 0.5rem;
+    margin-top: 1rem;
+    color: #27ae60;
 }
 
-.payment-methods {
-    margin-bottom: 1.5rem;
-}
-
-.payment-options {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin: 1rem 0;
-}
-
-.payment-btn {
-    background: #34495e;
-    color: white;
-    border: none;
-    padding: 1rem;
+.payment-form {
+    background: #ffffff;
+    padding: 1.5rem;
     border-radius: 8px;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.payment-btn:hover {
-    background: #2c3e50;
+.card-preview {
+    perspective: 1000px;
+    margin-bottom: 2rem;
 }
 
-.payment-btn.active {
-    background: #42b983;
+.card-front, .card-back {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    border-radius: 12px;
+    padding: 1.5rem;
+    color: white;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.payment-btn i {
+.card-logo {
     font-size: 1.5rem;
-}
-
-.qr-container {
-    text-align: center;
-    margin: 1rem 0;
-}
-
-.qr-code {
-    max-width: 200px;
-    margin: 1rem auto;
-}
-
-.input-group {
+    font-weight: bold;
     margin-bottom: 1rem;
 }
 
-.input-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-}
-
-.input-group input {
-    width: 100%;
-    padding: 0.5rem;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-    background: #2c3e50;
-    color: white;
+.card-number {
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+    margin-bottom: 1.5rem;
 }
 
 .card-details {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-
-.payment-actions {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+}
+
+.card-holder, .card-expiry {
+    font-size: 0.8rem;
+}
+
+.card-holder span, .card-expiry span {
+    display: block;
+    opacity: 0.7;
+    margin-bottom: 0.3rem;
+}
+
+.card-back {
+    background: linear-gradient(135deg, #2c3e50, #34495e);
+}
+
+.card-strip {
+    height: 40px;
+    background: #1a1a1a;
+    margin: 1rem 0;
+}
+
+.card-cvv {
+    text-align: right;
+    font-size: 0.8rem;
+}
+
+.card-cvv span {
+    display: block;
+    opacity: 0.7;
+    margin-bottom: 0.3rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #bdc3c7;
+}
+
+.card-input {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f9f9f9;
+    color: #333;
+    font-size: 1rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.card-input:focus {
+    border-color: #27ae60;
+    box-shadow: 0 0 5px rgba(39, 174, 96, 0.5);
+    outline: none;
+}
+
+.form-row {
+    display: flex;
     gap: 1rem;
 }
 
-.cancel-btn {
-    background: #e74c3c;
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
+.form-row .form-group {
+    flex: 1;
+    max-width: 48%; /* Reduce width for smaller input fields */
 }
 
-.complete-btn {
-    background: #42b983;
+.pay-btn {
+    width: 100%;
+    padding: 1rem;
+    background: #27ae60;
     color: white;
     border: none;
-    padding: 0.5rem 1rem;
     border-radius: 4px;
+    font-size: 1rem;
     cursor: pointer;
+    margin-top: 1rem;
+    transition: background 0.3s, transform 0.3s;
 }
 
-.complete-btn:disabled {
+.pay-btn:hover:not(:disabled) {
+    background: #219150;
+    transform: translateY(-2px);
+}
+
+.pay-btn:disabled {
     background: #34495e;
     cursor: not-allowed;
 }
 
-.change {
-    color: #42b983;
-    font-weight: bold;
+.qr-container {
+    text-align: center;
+    padding: 1.5rem;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.qr-code {
+    margin: 1rem 0;
+    display: flex;
+    justify-content: center;
+}
+
+.qr-code canvas {
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+
+.complete-btn, .close-btn {
+    padding: 0.8rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.3s;
+}
+
+.complete-btn {
+    background: #27ae60;
+    color: white;
+    border: none;
+}
+
+.complete-btn:hover {
+    background: #219150;
+    transform: translateY(-2px);
+}
+
+.close-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+}
+
+.close-btn:hover {
+    background: #c0392b;
+    transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+    .payment-screen {
+        padding: 1rem;
+        max-width: 100%;
+    }
+
+    .order-details, .payment-form, .qr-container {
+        padding: 1rem;
+    }
+
+    .form-row {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-row .form-group {
+        max-width: 100%; /* Full width on smaller screens */
+    }
+
+    .pay-btn, .complete-btn, .close-btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .card-input {
+        font-size: 0.9rem;
+    }
+
+    .card-logo {
+        font-size: 1.2rem;
+    }
+
+    .card-number {
+        font-size: 1rem;
+    }
 }
 </style> 

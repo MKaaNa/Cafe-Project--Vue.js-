@@ -31,10 +31,10 @@ api.interceptors.response.use(
 );
 
 // Auth işlemleri
-export const login = (credentials) => api.post('/auth/login', credentials);
-export const register = (userData) => api.post('/auth/register', userData);
-export const forgotPassword = (email) => api.post('/auth/forgot-password', { email });
-export const resetPassword = (token, password) => api.post('/auth/reset-password', { token, password });
+export const login = (credentials) => api.post('/login', credentials);
+export const register = (userData) => api.post('/register', userData);
+export const forgotPassword = (email) => api.post('/forgot-password', { email });
+export const resetPassword = (token, password) => api.post('/reset-password', { token, password });
 
 // Kullanıcı işlemleri
 export const fetchUsers = () => api.get('/users');
@@ -53,14 +53,22 @@ export const updateMenuItem = (id, itemData) => api.put(`/menu/${id}`, itemData)
 export const deleteMenuItem = (id) => api.delete(`/menu/${id}`);
 
 // Ödeme işlemleri
-export const createPayment = async (paymentData) => {
-    const response = await api.post('/payments', paymentData);
-    return response.data;
-};
+export const createPayment = (paymentData) => api.post('/payments', paymentData);
+export const getPayments = () => api.get('/payments');
 
-export const getPayments = async () => {
-    const response = await api.get('/payments');
-    return response.data;
-};
+// Fatura işlemleri
+export const fetchInvoice = (invoiceId) => api.get(`/api/invoices/${invoiceId}`);
+export const downloadInvoice = (invoiceId) => api.get(`/api/invoices/${invoiceId}/download`, {
+    responseType: 'blob'
+});
+
+// QR kod işlemleri
+export const generateQRCode = (data) => api.post('/api/qr/generate', { data });
+
+// Yeni eklenen işlemler
+export const fetchStaffStats = () => api.get('/staff/stats');
+export const updateStaffStats = (id, statsData) => api.put(`/staff/stats/${id}`, statsData);
+export const createStaffStats = (statsData) => api.post('/staff/stats', statsData);
+export const createDailyIncome = (incomeData) => api.post('/daily-income', incomeData);
 
 export default api;
