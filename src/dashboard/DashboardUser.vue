@@ -22,7 +22,18 @@
         <!-- İçerik -->
         <div v-if="currentTab === 'order'" class="order-form">
             <h2>📝 Yeni Sipariş Oluştur</h2>
-            <input v-model="table" placeholder="Masa Numarası" class="table-input" />
+            <div class="animated-input-container">
+                <input 
+                    type="number" 
+                    id="tableNumber" 
+                    v-model="table" 
+                    class="animated-input" 
+                    placeholder=" " 
+                    min="1" 
+                    required 
+                />
+                <label for="tableNumber" class="animated-label">Masa Numarası</label>
+            </div>
             <div class="menu-grid">
                 <div class="menu-card" v-for="item in menu" :key="item.id">
                     <img :src="item.image" alt="product image" class="menu-img" />
@@ -86,14 +97,29 @@
                 </div>
             </div>
         </div>
+
+        <!-- Ödeme Ekranı Modal -->
+        <div v-if="showPaymentScreen" class="modal-overlay">
+            <div class="modal-content">
+                <PaymentScreen 
+                    :order="currentOrder"
+                    @payment-completed="handlePaymentCompleted"
+                    @cancel="showPaymentScreen = false"
+                />
+            </div>
+        </div>
     </div>
 </template>
 
 <script>
-import axios from 'axios';
+import { fetchOrders, fetchUsers, createOrder, updateOrderStatus, fetchMenu } from '@/utils/api';
+import PaymentScreen from '@/components/PaymentScreen.vue';
 
 export default {
     name: 'DashboardUser',
+    components: {
+        PaymentScreen
+    },
     data() {
         return {
             user: {},
@@ -103,7 +129,9 @@ export default {
             order: [],
             activeOrders: [],
             historyOrders: [],
-            currentTab: 'order'  // Varsayılan sekme sipariş verme ekranı olsun
+            currentTab: 'order',  // Varsayılan sekme sipariş verme ekranı olsun
+            showPaymentScreen: false,
+            currentOrder: null
         };
     },
     computed: {
@@ -142,32 +170,39 @@ export default {
     methods: {
         async fetchMenu() {
             try {
-                const res = await axios.get('http://localhost:3000/menu');
-                this.menu = res.data;
+                const response = await fetchMenu();
+                this.menu = response.data;
             } catch (error) {
                 console.error("Menu verisi alınırken hata oluştu:", error);
+                alert('Menü verileri yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
             }
         },
         async fetchOrders() {
             try {
-                const res = await axios.get('http://localhost:3000/orders');
-                const orders = res.data;
-                this.activeOrders = orders.filter(order => order.status !== 'teslim edildi' && order.status !== 'iptal edildi');
-                this.historyOrders = orders.filter(order => order.status === 'teslim edildi');
+                const response = await fetchOrders();
+                // Aktif siparişler: teslim edilmemiş ve iptal edilmemiş siparişler
+                this.activeOrders = response.data.filter(order => 
+                    order.status !== 'teslim edildi' && 
+                    order.status !== 'iptal edildi' &&
+                    order.status !== 'gün sonu'
+                );
+                // Geçmiş siparişler: teslim edilmiş siparişler
+                this.historyOrders = response.data.filter(order => 
+                    order.status === 'teslim edildi' || 
+                    order.status === 'gün sonu'
+                );
             } catch (error) {
-                console.error('Sipariş verisi alınırken hata oluştu:', error);
-                if (error.response && error.response.status === 401) {
-                    alert('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.');
-                    this.$router.push('/login'); // Login sayfasına yönlendir
-                }
+                console.error('Sipariş verisi alınırken hata:', error);
+                alert('Sipariş verileri yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
             }
         },
         async fetchUsers() {
             try {
-                const res = await axios.get('http://localhost:3000/users');
-                this.users = res.data;
+                const response = await fetchUsers();
+                this.users = response.data;
             } catch (error) {
-                console.error("Kullanıcı verisi alınırken hata oluştu:", error);
+                console.error('Kullanıcı verisi alınırken hata:', error);
+                alert('Kullanıcı verileri yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
             }
         },
         addToOrder(item) {
@@ -193,6 +228,12 @@ export default {
                 alert('Masa numarası ve ürün seçimi gereklidir.');
                 return;
             }
+
+            if (this.table < 1) {
+                alert('Geçerli bir masa numarası giriniz.');
+                return;
+            }
+
             const newOrder = {
                 table: this.table,
                 items: this.order.map(item => ({
@@ -206,31 +247,32 @@ export default {
                 timestamp: new Date().toISOString(),
                 createdBy: this.user.email
             };
+
             try {
-                await axios.post('http://localhost:3000/orders', newOrder);
-                alert('Sipariş gönderildi.');
+                await createOrder(newOrder);
+                alert('Sipariş başarıyla gönderildi.');
                 this.order = [];
-                this.fetchOrders();
+                this.table = '';
+                await this.fetchOrders();
             } catch (error) {
                 console.error("Sipariş gönderilirken hata oluştu:", error);
+                alert('Sipariş gönderilirken bir hata oluştu. Lütfen tekrar deneyin.');
             }
         },
         async markAsDelivered(order) {
-            order.status = 'teslim edildi';
             try {
-                await axios.put(`http://localhost:3000/orders/${order.id}`, order);
+                await updateOrderStatus(order.id, 'teslim edildi');
+                this.currentOrder = order;
+                this.showPaymentScreen = true;
                 this.fetchOrders();
             } catch (error) {
                 console.error("Sipariş teslim edilirken hata oluştu:", error);
+                alert('Bir hata oluştu. Lütfen tekrar deneyin.');
             }
         },
         async cancelOrder(order) {
             try {
-                // Sipariş durumunu "iptal edildi" olarak güncelle
-                order.status = 'iptal edildi';
-                await axios.put(`http://localhost:3000/orders/${order.id}`, order);
-
-                // Sipariş listesini yeniden yükle
+                await updateOrderStatus(order.id, 'iptal edildi');
                 this.fetchOrders();
                 alert('Sipariş başarıyla iptal edildi.');
             } catch (error) {
@@ -258,6 +300,11 @@ export default {
             }
             // Eğer item zaten bir nesne ise, doğrudan döndür
             return item;
+        },
+        async handlePaymentCompleted() {
+            this.showPaymentScreen = false;
+            this.fetchOrders();
+            alert('Ödeme başarıyla tamamlandı!');
         }
     }
 };
@@ -426,5 +473,66 @@ export default {
 
 .cancel-btn:hover {
     background: #c0392b;
+}
+
+.animated-input-container {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.animated-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 16px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.animated-input:focus {
+    border-color: #42b983;
+    box-shadow: 0 0 8px rgba(66, 185, 131, 0.3);
+}
+
+.animated-input:focus + .animated-label,
+.animated-input:not(:placeholder-shown) + .animated-label {
+    top: -10px;
+    left: 10px;
+    font-size: 12px;
+    color: #42b983;
+}
+
+.animated-label {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    transform: translateY(-50%);
+    font-size: 16px;
+    color: #aaa;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #1e1e1e;
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 </style>

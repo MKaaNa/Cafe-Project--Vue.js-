@@ -31,7 +31,7 @@
                     <!-- Eğer aktif moddaysa güncelleme select'i göster -->
                     <td v-if="mode !== 'history'">
                         <div v-if="!['teslim edildi', 'iptal edildi'].includes(order.status)">
-                            <select :value="order.status" @change="updateStatus(order, $event.target.value)">
+                            <select :value="order.status" @change="updateStatus(order.id, $event.target.value)">
                                 <option value="onay bekliyor">onay bekliyor</option>
                                 <option value="hazır">hazır</option>
                                 <option value="iptal edildi">iptal edildi</option>
@@ -81,7 +81,9 @@ export default {
                 maxPrice: null
             },
             currentPage: 1,
-            itemsPerPage: 10
+            itemsPerPage: 10,
+            loading: false,
+            error: null
         };
     },
     computed: {
@@ -103,23 +105,28 @@ export default {
             this.$router.push('/login'); // Giriş yapılmamışsa login sayfasına yönlendir
             return;
         }
-        await this.fetchUsers();
-        this.debouncedFetchOrders();
+        this.debouncedLoadUsers();
+        this.debouncedLoadOrders();
     },
     methods: {
-        async fetchOrders() {
+        async loadUsers() {
             try {
-                const allOrders = await fetchOrders();
-                this.orders = allOrders.filter(order => order.createdBy === this.$root.user.email); // Ek kontrol
+                const response = await fetchUsers();
+                this.users = response.data;
             } catch (error) {
-                alert(error.message);
+                console.error('Kullanıcılar yüklenirken hata oluştu:', error);
+                this.error = 'Kullanıcılar yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.';
+                alert(this.error);
             }
         },
-        async fetchUsers() {
+        async loadOrders() {
             try {
-                this.users = await fetchUsers();
+                const response = await fetchOrders();
+                this.orders = response.data;
             } catch (error) {
-                alert(error.message);
+                console.error('Siparişler yüklenirken hata oluştu:', error);
+                this.error = 'Siparişler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.';
+                alert(this.error);
             }
         },
         getGarsonName(email) {
@@ -130,30 +137,31 @@ export default {
         formatDate(timestamp) {
             return new Date(timestamp).toLocaleString('tr-TR');
         },
-        async updateStatus(order, newStatus) {
-            const validStatuses = ['onay bekliyor', 'hazır', 'iptal edildi', 'teslim edildi'];
-            if (!validStatuses.includes(newStatus)) {
-                alert('Geçersiz sipariş durumu seçildi.');
-                return;
-            }
-
-            console.log('Güncellenen sipariş ID:', order.id); // ID'yi kontrol edin
-            order.status = newStatus;
+        async updateStatus(orderId, status) {
             try {
-                await updateOrderStatus(order.id, order);
-                this.debouncedFetchOrders();
+                await updateOrderStatus(orderId, status);
+                await this.loadOrders();
             } catch (error) {
-                alert(error.message);
+                console.error('Sipariş durumu güncellenirken hata oluştu:', error);
+                this.error = 'Sipariş durumu güncellenirken bir hata oluştu. Lütfen tekrar deneyin.';
+                alert(this.error);
             }
         },
-        debouncedFetchOrders: debounce(async function () {
-            await this.fetchOrders();
-        }, 500) // 500ms gecikme
+        debouncedLoadUsers: debounce(async function () {
+            await this.loadUsers();
+        }, 500),
+        debouncedLoadOrders: debounce(async function () {
+            await this.loadOrders();
+        }, 500),
+        debouncedUpdateStatus: debounce(async function (orderId, status) {
+            await this.updateStatus(orderId, status);
+        }, 500)
     },
     watch: {
         filters: {
             handler() {
                 this.currentPage = 1;
+                this.debouncedLoadOrders();
             },
             deep: true
         }

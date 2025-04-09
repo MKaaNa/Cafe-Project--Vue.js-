@@ -4,11 +4,13 @@ import LoginPage from '../components/LoginPage.vue';
 import SignUpPage from '../components/SignUp.vue';
 import DashboardAdmin from '../dashboard/DashboardAdmin.vue';
 import DashboardUser from '../dashboard/DashboardUser.vue';
+import ForgotPassword from '../components/ForgotPassword.vue';
 
 const routes = [
     { path: '/', redirect: '/login' },
     { path: '/login', component: LoginPage },
     { path: '/signup', component: SignUpPage },
+    { path: '/forgot-password', component: ForgotPassword },
     { path: '/dashboard/admin', component: DashboardAdmin },
     { path: '/dashboard/user', component: DashboardUser }
 ];

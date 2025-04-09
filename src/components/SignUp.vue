@@ -19,7 +19,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import { register } from '@/utils/api';
 
 export default {
   name: 'SignUpPage',
@@ -46,16 +46,22 @@ export default {
         const user = {
           name: this.name,
           email: this.email,
-          password: this.password,
-          role: 'user'
+          password: this.password
         };
 
-        await axios.post('http://localhost:3000/users', user);
-        alert('Kayıt başarılı! Giriş yapabilirsiniz.');
-        this.$router.push('/login');
+        const response = await register(user);
+        
+        if (response.status === 201) {
+          alert('Kayıt başarılı! Giriş yapabilirsiniz.');
+          this.$router.push('/login');
+        }
       } catch (error) {
         console.error('Kayıt hatası:', error);
-        alert('Kayıt işlemi sırasında hata oluştu.');
+        if (error.response && error.response.data && error.response.data.message) {
+          alert(error.response.data.message);
+        } else {
+          alert('Kayıt işlemi sırasında bir hata oluştu.');
+        }
       }
     },
     goToLogin() {
