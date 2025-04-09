@@ -1,33 +1,47 @@
 import axios from 'axios';
 
+const BASE_URL = 'http://localhost:3000';
+
 const api = axios.create({
-    baseURL: 'http://localhost:3000', // Backend URL
+    baseURL: BASE_URL,
     headers: {
         'Content-Type': 'application/json'
     }
 });
 
-// Her istekte Authorization başlığını ekle
+// Token'ı localStorage'dan al ve her istekte header'a ekle
 api.interceptors.request.use(config => {
-    const token = localStorage.getItem('token'); // Token'ı localStorage'dan al
+    const token = localStorage.getItem('token');
     if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`; // Authorization başlığını ekle
+        config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
 });
 
-// 401 hatalarını global olarak ele al
-api.interceptors.response.use(
-    response => response,
-    error => {
-        if (error.response && error.response.status === 401) {
-            console.warn('Token geçersiz veya süresi dolmuş. Oturum kapatılıyor.');
-            localStorage.removeItem('user'); // Kullanıcı bilgilerini temizle
-            localStorage.removeItem('token'); // Token'ı temizle
-            window.location.href = '/login'; // Login sayfasına yönlendir
-        }
-        return Promise.reject(error);
-    }
-);
+// Kullanıcı işlemleri
+export const register = (userData) => api.post('/register', userData);
+export const login = (credentials) => api.post('/login', credentials);
+export const getCurrentUser = () => api.get('/users/me');
+
+// Kullanıcı yönetimi
+export const fetchUsers = () => api.get('/users');
+export const createUser = (userData) => api.post('/users', userData);
+export const updateUser = (userId, userData) => api.put(`/users/${userId}`, userData);
+export const deleteUser = (userId) => api.delete(`/users/${userId}`);
+
+// Sipariş işlemleri
+export const fetchOrders = () => api.get('/orders');
+export const createOrder = (orderData) => api.post('/orders', orderData);
+export const updateOrderStatus = (orderId, status) => api.put(`/orders/${orderId}/status`, { status });
+
+// Menü işlemleri
+export const fetchMenu = () => api.get('/menu');
+export const createMenuItem = (itemData) => api.post('/menu', itemData);
+export const updateMenuItem = (itemId, itemData) => api.put(`/menu/${itemId}`, itemData);
+export const deleteMenuItem = (itemId) => api.delete(`/menu/${itemId}`);
+
+// Ödeme işlemleri
+export const fetchPayments = () => api.get('/payments');
+export const createPayment = (paymentData) => api.post('/payments', paymentData);
 
 export default api;

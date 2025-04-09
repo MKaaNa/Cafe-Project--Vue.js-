@@ -11,6 +11,10 @@
         </form>
 
         <p class="switch-link">
+            <a href="#" @click.prevent="goToForgotPassword">Şifremi Unuttum</a>
+        </p>
+
+        <p class="switch-link">
             Hesabınız yok mu?
             <a href="#" @click.prevent="goToRegister">Kayıt olun</a>
         </p>
@@ -18,7 +22,7 @@
 </template>
 
 <script>
-import axios from 'axios';
+import { login } from '@/utils/api';
 
 export default {
     name: 'LoginPage',
@@ -36,7 +40,7 @@ export default {
             }
 
             try {
-                const response = await axios.post('http://localhost:3000/login', {
+                const response = await login({
                     email: this.email,
                     password: this.password
                 });
@@ -48,8 +52,8 @@ export default {
                     return;
                 }
 
-                localStorage.setItem('user', JSON.stringify(user)); // Kullanıcı bilgilerini kaydet
-                localStorage.setItem('token', token); // Token'ı kaydet
+                localStorage.setItem('user', JSON.stringify(user));
+                localStorage.setItem('token', token);
 
                 if (user.role === 'admin') {
                     this.$router.push('/dashboard/admin');
@@ -69,6 +73,9 @@ export default {
         },
         goToRegister() {
             this.$router.push('/signup');
+        },
+        goToForgotPassword() {
+            this.$router.push('/forgot-password');
         }
     }
 };
